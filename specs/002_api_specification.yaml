@@ -1,0 +1,3424 @@
+# =============================================================================
+# Cyber Chakra Forensics - Admin Portal API Specification
+# OpenAPI 3.1.0
+# =============================================================================
+# This document defines:
+#   Part A: Admin Portal REST API  (/api/v1/*)
+#   Part B: Public Desktop App API (/api/public/v1/*)
+# =============================================================================
+
+openapi: "3.1.0"
+info:
+  title: Cyber Chakra Forensics Admin Portal API
+  version: "1.0.0"
+  description: |
+    REST API for the CMF Admin Portal and the public-facing desktop app endpoints.
+    All admin endpoints require Bearer token authentication.
+    All public endpoints require a valid license key (X-License-Key header).
+
+servers:
+  - url: https://admin.cyberchakra.in
+    description: Production
+  - url: https://staging-admin.cyberchakra.in
+    description: Staging
+
+# =============================================================================
+# Security Schemes
+# =============================================================================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Admin portal JWT token obtained from /api/v1/auth/login.
+
+    LicenseKeyAuth:
+      type: apiKey
+      in: header
+      name: X-License-Key
+      description: License key for public desktop app endpoints.
+
+  # ===========================================================================
+  # Shared Schemas
+  # ===========================================================================
+  schemas:
+
+    # ---- Pagination ----
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        per_page:
+          type: integer
+          example: 25
+        total:
+          type: integer
+          example: 142
+        total_pages:
+          type: integer
+          example: 6
+        has_next:
+          type: boolean
+        has_prev:
+          type: boolean
+
+    PaginationParams:
+      type: object
+      properties:
+        page:
+          type: integer
+          default: 1
+          minimum: 1
+        per_page:
+          type: integer
+          default: 25
+          minimum: 1
+          maximum: 100
+        sort_by:
+          type: string
+        sort_order:
+          type: string
+          enum: [asc, desc]
+          default: desc
+
+    # ---- Error ----
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "VALIDATION_ERROR"
+            message:
+              type: string
+              example: "Invalid request parameters"
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string
+
+    # ---- Organization ----
+    Organization:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        org_type:
+          type: string
+          enum: [law_enforcement, government, forensics_lab, military, corporate, academic, individual, other]
+        status:
+          type: string
+          enum: [active, suspended, churned, trial]
+        address_line_1:
+          type: string
+        address_line_2:
+          type: string
+        city:
+          type: string
+        state_province:
+          type: string
+        postal_code:
+          type: string
+        country_code:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        website:
+          type: string
+        gst_number:
+          type: string
+        pan_number:
+          type: string
+        notes:
+          type: string
+        metadata:
+          type: object
+        max_licenses:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    OrganizationCreate:
+      type: object
+      required: [name, org_type]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 255
+        org_type:
+          type: string
+          enum: [law_enforcement, government, forensics_lab, military, corporate, academic, individual, other]
+        address_line_1:
+          type: string
+        address_line_2:
+          type: string
+        city:
+          type: string
+        state_province:
+          type: string
+        postal_code:
+          type: string
+        country_code:
+          type: string
+          maxLength: 2
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+        website:
+          type: string
+          format: uri
+        gst_number:
+          type: string
+        pan_number:
+          type: string
+        notes:
+          type: string
+        metadata:
+          type: object
+        max_licenses:
+          type: integer
+          default: 1
+          minimum: 1
+
+    OrganizationUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        org_type:
+          type: string
+        status:
+          type: string
+        address_line_1:
+          type: string
+        address_line_2:
+          type: string
+        city:
+          type: string
+        state_province:
+          type: string
+        postal_code:
+          type: string
+        country_code:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        website:
+          type: string
+        gst_number:
+          type: string
+        pan_number:
+          type: string
+        notes:
+          type: string
+        metadata:
+          type: object
+        max_licenses:
+          type: integer
+
+    # ---- Contact ----
+    Contact:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        designation:
+          type: string
+        department:
+          type: string
+        role:
+          type: string
+          enum: [primary, technical, billing, admin, user]
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    # ---- License ----
+    License:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        organization:
+          $ref: '#/components/schemas/Organization'
+        contact_id:
+          type: string
+          format: uuid
+        license_key:
+          type: string
+        license_type:
+          type: string
+          enum: [trial, standard, professional, enterprise, government, academic, oem]
+        status:
+          type: string
+          enum: [active, expired, suspended, revoked, pending_activation]
+        issued_at:
+          type: string
+          format: date-time
+        activated_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        max_activations:
+          type: integer
+        current_activations:
+          type: integer
+        product_version:
+          type: string
+        features:
+          type: object
+        purchase_order:
+          type: string
+        invoice_ref:
+          type: string
+        notes:
+          type: string
+        activations:
+          type: array
+          items:
+            $ref: '#/components/schemas/LicenseActivation'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    LicenseCreate:
+      type: object
+      required: [organization_id, license_type, max_activations]
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        contact_id:
+          type: string
+          format: uuid
+        license_type:
+          type: string
+          enum: [trial, standard, professional, enterprise, government, academic, oem]
+        max_activations:
+          type: integer
+          minimum: 1
+          default: 1
+        expires_at:
+          type: string
+          format: date-time
+          description: "Null for perpetual licenses"
+        product_version:
+          type: string
+        features:
+          type: object
+          description: "Feature flags for this license"
+        purchase_order:
+          type: string
+        invoice_ref:
+          type: string
+        notes:
+          type: string
+
+    LicenseActivation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        license_id:
+          type: string
+          format: uuid
+        machine_id:
+          type: string
+        machine_name:
+          type: string
+        os_info:
+          type: string
+        app_version:
+          type: string
+        ip_address:
+          type: string
+        is_active:
+          type: boolean
+        activated_at:
+          type: string
+          format: date-time
+        deactivated_at:
+          type: string
+          format: date-time
+        last_heartbeat:
+          type: string
+          format: date-time
+        heartbeat_count:
+          type: integer
+
+    LicenseEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        license_id:
+          type: string
+          format: uuid
+        activation_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+        machine_id:
+          type: string
+        ip_address:
+          type: string
+        triggered_by:
+          type: string
+        details:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+
+    # ---- Release ----
+    Release:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: string
+        version_code:
+          type: integer
+        channel:
+          type: string
+          enum: [stable, beta, alpha, nightly, lts]
+        status:
+          type: string
+          enum: [draft, published, deprecated, yanked]
+        title:
+          type: string
+        release_notes:
+          type: string
+        is_mandatory:
+          type: boolean
+        is_security:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+        assets:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReleaseAsset'
+        created_at:
+          type: string
+          format: date-time
+
+    ReleaseAsset:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        release_id:
+          type: string
+          format: uuid
+        platform:
+          type: string
+          enum: [windows_x64, windows_arm64, linux_x64, linux_arm64, macos_x64, macos_arm64]
+        filename:
+          type: string
+        file_size:
+          type: integer
+        content_type:
+          type: string
+        sha256_hash:
+          type: string
+        installer_type:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    # ---- Announcement ----
+    Announcement:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        body:
+          type: string
+        body_html:
+          type: string
+        announcement_type:
+          type: string
+          enum: [info, warning, critical, maintenance, feature, promotion]
+        target:
+          type: string
+          enum: [all, trial, standard, professional, enterprise, government, specific_orgs]
+        is_dismissible:
+          type: boolean
+        is_pinned:
+          type: boolean
+        action_url:
+          type: string
+        action_label:
+          type: string
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+        is_published:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    # ---- Support Ticket ----
+    SupportTicket:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ticket_number:
+          type: string
+        organization_id:
+          type: string
+          format: uuid
+        contact_id:
+          type: string
+          format: uuid
+        license_id:
+          type: string
+          format: uuid
+        requester_name:
+          type: string
+        requester_email:
+          type: string
+        subject:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+        status:
+          type: string
+          enum: [open, in_progress, waiting_on_customer, waiting_on_internal, resolved, closed]
+        assigned_to:
+          type: string
+          format: uuid
+        resolution:
+          type: string
+        device_info:
+          type: object
+        app_version:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/TicketMessage'
+        created_at:
+          type: string
+          format: date-time
+
+    TicketMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sender_type:
+          type: string
+          enum: [customer, admin, system]
+        sender_name:
+          type: string
+        body:
+          type: string
+        body_html:
+          type: string
+        attachments:
+          type: array
+          items:
+            type: object
+        is_internal:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    # ---- Invoice ----
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoice_number:
+          type: string
+        organization_id:
+          type: string
+          format: uuid
+        license_id:
+          type: string
+          format: uuid
+        currency:
+          type: string
+        subtotal:
+          type: number
+        tax_amount:
+          type: number
+        tax_rate:
+          type: number
+        discount_amount:
+          type: number
+        total:
+          type: number
+        amount_paid:
+          type: number
+        status:
+          type: string
+          enum: [draft, sent, paid, overdue, cancelled, refunded]
+        issued_at:
+          type: string
+          format: date
+        due_at:
+          type: string
+          format: date
+        line_items:
+          type: array
+          items:
+            type: object
+        created_at:
+          type: string
+          format: date-time
+
+    # ---- Admin User ----
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        username:
+          type: string
+        display_name:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, admin, support, viewer, analyst]
+        is_active:
+          type: boolean
+        mfa_enabled:
+          type: boolean
+        last_login_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    # ---- Analytics ----
+    AnalyticsSummary:
+      type: object
+      properties:
+        period:
+          type: string
+          description: "e.g., '2026-03-01/2026-03-28'"
+        total_events:
+          type: integer
+        unique_machines:
+          type: integer
+        unique_sessions:
+          type: integer
+        acquisitions:
+          type: integer
+        analyses:
+          type: integer
+        reports:
+          type: integer
+        errors:
+          type: integer
+        daily_breakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              event_count:
+                type: integer
+              unique_machines:
+                type: integer
+
+    # ---- Dashboard ----
+    DashboardStats:
+      type: object
+      properties:
+        active_organizations:
+          type: integer
+        active_licenses:
+          type: integer
+        expired_licenses:
+          type: integer
+        active_machines:
+          type: integer
+        open_tickets:
+          type: integer
+        downloads_30d:
+          type: integer
+        revenue_mtd:
+          type: number
+        licenses_expiring_soon:
+          type: integer
+          description: "Licenses expiring within 30 days"
+
+    # ---- Public API schemas (desktop app) ----
+
+    PublicActivateRequest:
+      type: object
+      required: [license_key, machine_id]
+      properties:
+        license_key:
+          type: string
+        machine_id:
+          type: string
+          description: "Hardware fingerprint hash"
+        machine_name:
+          type: string
+        os_info:
+          type: string
+        app_version:
+          type: string
+
+    PublicActivateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        activation_id:
+          type: string
+          format: uuid
+        license_type:
+          type: string
+        features:
+          type: object
+        expires_at:
+          type: string
+          format: date-time
+        activations_remaining:
+          type: integer
+        message:
+          type: string
+
+    PublicValidateRequest:
+      type: object
+      required: [license_key, machine_id]
+      properties:
+        license_key:
+          type: string
+        machine_id:
+          type: string
+        app_version:
+          type: string
+
+    PublicValidateResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        license_type:
+          type: string
+        status:
+          type: string
+        features:
+          type: object
+        expires_at:
+          type: string
+          format: date-time
+        days_remaining:
+          type: integer
+        message:
+          type: string
+
+    PublicHeartbeatRequest:
+      type: object
+      required: [license_key, machine_id]
+      properties:
+        license_key:
+          type: string
+        machine_id:
+          type: string
+        app_version:
+          type: string
+        session_id:
+          type: string
+        uptime_seconds:
+          type: integer
+        metrics:
+          type: object
+          description: "Optional usage metrics snapshot"
+
+    PublicHeartbeatResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        server_time:
+          type: string
+          format: date-time
+        commands:
+          type: array
+          items:
+            type: object
+            properties:
+              action:
+                type: string
+                enum: [none, force_update, show_announcement, revoke]
+              payload:
+                type: object
+
+    PublicUpdateCheckRequest:
+      type: object
+      required: [current_version, platform]
+      properties:
+        current_version:
+          type: string
+        platform:
+          type: string
+          enum: [windows_x64, windows_arm64, linux_x64, linux_arm64, macos_x64, macos_arm64]
+        channel:
+          type: string
+          enum: [stable, beta, alpha, nightly, lts]
+          default: stable
+        license_key:
+          type: string
+
+    PublicUpdateCheckResponse:
+      type: object
+      properties:
+        update_available:
+          type: boolean
+        is_mandatory:
+          type: boolean
+        is_security:
+          type: boolean
+        latest_version:
+          type: string
+        version_code:
+          type: integer
+        release_notes:
+          type: string
+        download_url:
+          type: string
+          format: uri
+        file_size:
+          type: integer
+        sha256_hash:
+          type: string
+        published_at:
+          type: string
+          format: date-time
+
+    PublicAnnouncementItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        body_html:
+          type: string
+        announcement_type:
+          type: string
+        is_dismissible:
+          type: boolean
+        is_pinned:
+          type: boolean
+        action_url:
+          type: string
+        action_label:
+          type: string
+        starts_at:
+          type: string
+          format: date-time
+
+  # ===========================================================================
+  # Shared Parameters
+  # ===========================================================================
+  parameters:
+    PathId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    QueryPage:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+    QueryPerPage:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        default: 25
+        minimum: 1
+        maximum: 100
+    QuerySortBy:
+      name: sort_by
+      in: query
+      schema:
+        type: string
+    QuerySortOrder:
+      name: sort_order
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+    QuerySearch:
+      name: search
+      in: query
+      schema:
+        type: string
+      description: "Full-text / trigram search"
+
+# =============================================================================
+# PART A: Admin Portal REST API
+# =============================================================================
+
+security:
+  - BearerAuth: []
+
+paths:
+
+  # ===========================================================================
+  # AUTH
+  # ===========================================================================
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Authenticate admin user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                mfa_code:
+                  type: string
+                  description: "TOTP code, required when MFA enabled"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: "JWT access token"
+                  refresh_token:
+                    type: string
+                  expires_at:
+                    type: string
+                    format: date-time
+                  user:
+                    $ref: '#/components/schemas/AdminUser'
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "423":
+          description: Account locked (too many failed attempts)
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        "200":
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  refresh_token:
+                    type: string
+                  expires_at:
+                    type: string
+                    format: date-time
+        "401":
+          description: Invalid or expired refresh token
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke current session
+      responses:
+        "204":
+          description: Session revoked
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current admin user profile
+      responses:
+        "200":
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+
+  # ===========================================================================
+  # ORGANIZATIONS
+  # ===========================================================================
+  /api/v1/organizations:
+    get:
+      tags: [Organizations]
+      summary: List organizations
+      parameters:
+        - $ref: '#/components/parameters/QueryPage'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - $ref: '#/components/parameters/QuerySortBy'
+        - $ref: '#/components/parameters/QuerySortOrder'
+        - $ref: '#/components/parameters/QuerySearch'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, suspended, churned, trial]
+        - name: org_type
+          in: query
+          schema:
+            type: string
+        - name: country_code
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated list of organizations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Organization'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      tags: [Organizations]
+      summary: Create organization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationCreate'
+      responses:
+        "201":
+          description: Organization created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        "409":
+          description: Organization with same slug already exists
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/organizations/{id}:
+    get:
+      tags: [Organizations]
+      summary: Get organization by ID
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "200":
+          description: Organization details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Organization'
+                  - type: object
+                    properties:
+                      contacts:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Contact'
+                      licenses:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/License'
+                      recent_tickets:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SupportTicket'
+        "404":
+          description: Organization not found
+    patch:
+      tags: [Organizations]
+      summary: Update organization
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationUpdate'
+      responses:
+        "200":
+          description: Updated organization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        "404":
+          description: Organization not found
+        "422":
+          description: Validation error
+    delete:
+      tags: [Organizations]
+      summary: Soft-delete organization
+      description: |
+        Soft-deletes the organization (sets deleted_at).
+        Fails if the org has active licenses.
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "204":
+          description: Organization deleted
+        "404":
+          description: Organization not found
+        "409":
+          description: Cannot delete organization with active licenses
+
+  /api/v1/organizations/{id}/contacts:
+    get:
+      tags: [Organizations]
+      summary: List contacts for an organization
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/QueryPage'
+        - $ref: '#/components/parameters/QueryPerPage'
+      responses:
+        "200":
+          description: Contacts list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Contact'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      tags: [Organizations]
+      summary: Create contact for organization
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [first_name, last_name, email]
+              properties:
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                phone:
+                  type: string
+                designation:
+                  type: string
+                department:
+                  type: string
+                role:
+                  type: string
+                  enum: [primary, technical, billing, admin, user]
+                  default: user
+      responses:
+        "201":
+          description: Contact created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contact'
+        "409":
+          description: Contact email already exists in this org
+
+  /api/v1/organizations/{id}/contacts/{contactId}:
+    patch:
+      tags: [Organizations]
+      summary: Update contact
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                email:
+                  type: string
+                phone:
+                  type: string
+                designation:
+                  type: string
+                department:
+                  type: string
+                role:
+                  type: string
+                is_active:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated contact
+    delete:
+      tags: [Organizations]
+      summary: Soft-delete contact
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Contact deleted
+
+  # ===========================================================================
+  # LICENSES
+  # ===========================================================================
+  /api/v1/licenses:
+    get:
+      tags: [Licenses]
+      summary: List licenses
+      parameters:
+        - $ref: '#/components/parameters/QueryPage'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - $ref: '#/components/parameters/QuerySortBy'
+        - $ref: '#/components/parameters/QuerySortOrder'
+        - $ref: '#/components/parameters/QuerySearch'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, expired, suspended, revoked, pending_activation]
+        - name: license_type
+          in: query
+          schema:
+            type: string
+        - name: organization_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: expiring_within_days
+          in: query
+          schema:
+            type: integer
+            description: "Filter licenses expiring within N days"
+      responses:
+        "200":
+          description: Paginated licenses
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/License'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      tags: [Licenses]
+      summary: Create license
+      description: |
+        Creates a new license key. The key is auto-generated using a
+        cryptographically secure format: CCF-XXXX-XXXX-XXXX-XXXX.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LicenseCreate'
+      responses:
+        "201":
+          description: License created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/License'
+        "422":
+          description: Validation error
+
+  /api/v1/licenses/{id}:
+    get:
+      tags: [Licenses]
+      summary: Get license details
+      description: |
+        Returns full license info including activations and recent events.
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "200":
+          description: License details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/License'
+                  - type: object
+                    properties:
+                      activations:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/LicenseActivation'
+                      recent_events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/LicenseEvent'
+        "404":
+          description: License not found
+    patch:
+      tags: [Licenses]
+      summary: Update license
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                license_type:
+                  type: string
+                max_activations:
+                  type: integer
+                expires_at:
+                  type: string
+                  format: date-time
+                product_version:
+                  type: string
+                features:
+                  type: object
+                purchase_order:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        "200":
+          description: Updated license
+        "404":
+          description: License not found
+
+  /api/v1/licenses/{id}/suspend:
+    post:
+      tags: [Licenses]
+      summary: Suspend a license
+      description: |
+        Suspends an active license. All current activations are deactivated.
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: License suspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/License'
+        "409":
+          description: License is not in a suspendable state
+
+  /api/v1/licenses/{id}/reinstate:
+    post:
+      tags: [Licenses]
+      summary: Reinstate a suspended license
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                extend_days:
+                  type: integer
+                  description: "Optionally extend expiry by N days"
+      responses:
+        "200":
+          description: License reinstated
+        "409":
+          description: License is not suspended
+
+  /api/v1/licenses/{id}/revoke:
+    post:
+      tags: [Licenses]
+      summary: Permanently revoke a license
+      description: |
+        Permanently revokes a license. This is irreversible.
+        All activations are terminated immediately.
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: License revoked
+        "409":
+          description: License already revoked
+
+  /api/v1/licenses/{id}/renew:
+    post:
+      tags: [Licenses]
+      summary: Renew a license
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_expires_at]
+              properties:
+                new_expires_at:
+                  type: string
+                  format: date-time
+                invoice_ref:
+                  type: string
+      responses:
+        "200":
+          description: License renewed
+
+  /api/v1/licenses/{id}/activations:
+    get:
+      tags: [Licenses]
+      summary: List activations for a license
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - name: active_only
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Activations list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LicenseActivation'
+
+  /api/v1/licenses/{id}/activations/{activationId}/deactivate:
+    post:
+      tags: [Licenses]
+      summary: Admin-deactivate a specific machine
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - name: activationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Activation deactivated
+
+  /api/v1/licenses/{id}/events:
+    get:
+      tags: [Licenses]
+      summary: List audit events for a license
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/QueryPage'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - name: event_type
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: License events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LicenseEvent'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  # ===========================================================================
+  # ANALYTICS
+  # ===========================================================================
+  /api/v1/analytics/summary:
+    get:
+      tags: [Analytics]
+      summary: Get analytics summary
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: organization_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: license_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: group_by
+          in: query
+          schema:
+            type: string
+            enum: [day, week, month]
+            default: day
+      responses:
+        "200":
+          description: Analytics summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsSummary'
+
+  /api/v1/analytics/events:
+    get:
+      tags: [Analytics]
+      summary: Query raw analytics events
+      parameters:
+        - $ref: '#/components/parameters/QueryPage'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: event_name
+          in: query
+          schema:
+            type: string
+        - name: event_category
+          in: query
+          schema:
+            type: string
+        - name: license_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: machine_id
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Raw events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      description: "analytics_events row"
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  /api/v1/analytics/top-features:
+    get:
+      tags: [Analytics]
+      summary: Top features by usage
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Top features
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        event_name:
+                          type: string
+                        count:
+                          type: integer
+                        unique_machines:
+                          type: integer
+
+  /api/v1/analytics/geo:
+    get:
+      tags: [Analytics]
+      summary: Geographic distribution of usage
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Geographic breakdown
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        country_code:
+                          type: string
+                        country_name:
+                          type: string
+                        event_count:
+                          type: integer
+                        unique_machines:
+                          type: integer
+
+  /api/v1/analytics/ingest:
+    post:
+      tags: [Analytics]
+      summary: Ingest batch analytics events (internal)
+      description: |
+        Used by the public API relay or batch processors to insert
+        pre-validated analytics events into the system.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [events]
+              properties:
+                events:
+                  type: array
+                  maxItems: 1000
+                  items:
+                    type: object
+                    required: [event_name]
+                    properties:
+                      license_id:
+                        type: string
+                        format: uuid
+                      machine_id:
+                        type: string
+                      session_id:
+                        type: string
+                      event_name:
+                        type: string
+                      event_category:
+                        type: string
+                      event_data:
+                        type: object
+                      app_version:
+                        type: string
+                      os_platform:
+                        type: string
+                      client_timestamp:
+                        type: string
+                        format: date-time
+      responses:
+        "202":
+          description: Events accepted for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted:
+                    type: integer
+                  rejected:
+                    type: integer
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        index:
+                          type: integer
+                        reason:
+                          type: string
+
+  # ===========================================================================
+  # RELEASES
+  # ===========================================================================
+  /api/v1/releases:
+    get:
+      tags: [Releases]
+      summary: List releases
+      parameters:
+        - $ref: '#/components/parameters/QueryPage'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - name: channel
+          in: query
+          schema:
+            type: string
+            enum: [stable, beta, alpha, nightly, lts]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, published, deprecated, yanked]
+      responses:
+        "200":
+          description: Releases list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Release'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      tags: [Releases]
+      summary: Create release (draft)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version, version_code, title]
+              properties:
+                version:
+                  type: string
+                  description: "Semver string, e.g. 2.1.0"
+                version_code:
+                  type: integer
+                  description: "Monotonic integer for comparison"
+                channel:
+                  type: string
+                  enum: [stable, beta, alpha, nightly, lts]
+                  default: stable
+                title:
+                  type: string
+                release_notes:
+                  type: string
+                  description: "Markdown"
+                min_os_version:
+                  type: object
+                min_upgrade_from:
+                  type: string
+                is_mandatory:
+                  type: boolean
+                  default: false
+                is_security:
+                  type: boolean
+                  default: false
+      responses:
+        "201":
+          description: Release created in draft status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+        "409":
+          description: Version already exists
+
+  /api/v1/releases/{id}:
+    get:
+      tags: [Releases]
+      summary: Get release details
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "200":
+          description: Release with assets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+    patch:
+      tags: [Releases]
+      summary: Update release (draft only)
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                release_notes:
+                  type: string
+                channel:
+                  type: string
+                is_mandatory:
+                  type: boolean
+                is_security:
+                  type: boolean
+                min_os_version:
+                  type: object
+                min_upgrade_from:
+                  type: string
+      responses:
+        "200":
+          description: Release updated
+        "409":
+          description: Cannot update published release
+
+  /api/v1/releases/{id}/publish:
+    post:
+      tags: [Releases]
+      summary: Publish a release
+      description: |
+        Transitions a draft release to published status.
+        Requires at least one asset to be uploaded.
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "200":
+          description: Release published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+        "409":
+          description: Release has no assets or is already published
+
+  /api/v1/releases/{id}/deprecate:
+    post:
+      tags: [Releases]
+      summary: Deprecate a release
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "200":
+          description: Release deprecated
+
+  /api/v1/releases/{id}/yank:
+    post:
+      tags: [Releases]
+      summary: Yank a release (emergency removal)
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Release yanked
+
+  /api/v1/releases/{id}/assets:
+    get:
+      tags: [Releases]
+      summary: List assets for a release
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "200":
+          description: Release assets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReleaseAsset'
+    post:
+      tags: [Releases]
+      summary: Upload asset for release
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, platform, sha256_hash]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                platform:
+                  type: string
+                  enum: [windows_x64, windows_arm64, linux_x64, linux_arm64, macos_x64, macos_arm64]
+                installer_type:
+                  type: string
+                  description: "nsis, msi, appimage, deb, dmg"
+                sha256_hash:
+                  type: string
+                  description: "Pre-computed SHA-256 for verification"
+                signature:
+                  type: string
+                  description: "Code-signing signature"
+      responses:
+        "201":
+          description: Asset uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseAsset'
+        "409":
+          description: Asset for this platform/installer already exists
+        "413":
+          description: File too large
+        "422":
+          description: SHA-256 mismatch
+
+  /api/v1/releases/{id}/assets/{assetId}:
+    delete:
+      tags: [Releases]
+      summary: Delete a release asset
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - name: assetId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Asset deleted
+        "409":
+          description: Cannot delete asset from published release
+
+  # ===========================================================================
+  # ANNOUNCEMENTS
+  # ===========================================================================
+  /api/v1/announcements:
+    get:
+      tags: [Announcements]
+      summary: List announcements
+      parameters:
+        - $ref: '#/components/parameters/QueryPage'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - name: is_published
+          in: query
+          schema:
+            type: boolean
+        - name: announcement_type
+          in: query
+          schema:
+            type: string
+        - name: active_only
+          in: query
+          schema:
+            type: boolean
+            description: "Only return currently active (started, not ended)"
+      responses:
+        "200":
+          description: Announcements list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Announcement'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      tags: [Announcements]
+      summary: Create announcement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, body, announcement_type]
+              properties:
+                title:
+                  type: string
+                body:
+                  type: string
+                  description: "Markdown content"
+                announcement_type:
+                  type: string
+                  enum: [info, warning, critical, maintenance, feature, promotion]
+                target:
+                  type: string
+                  enum: [all, trial, standard, professional, enterprise, government, specific_orgs]
+                  default: all
+                target_org_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                target_versions:
+                  type: array
+                  items:
+                    type: string
+                target_platforms:
+                  type: array
+                  items:
+                    type: string
+                min_version:
+                  type: string
+                max_version:
+                  type: string
+                is_dismissible:
+                  type: boolean
+                  default: true
+                is_pinned:
+                  type: boolean
+                  default: false
+                action_url:
+                  type: string
+                action_label:
+                  type: string
+                starts_at:
+                  type: string
+                  format: date-time
+                ends_at:
+                  type: string
+                  format: date-time
+      responses:
+        "201":
+          description: Announcement created (unpublished)
+
+  /api/v1/announcements/{id}:
+    get:
+      tags: [Announcements]
+      summary: Get announcement
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "200":
+          description: Announcement details
+    patch:
+      tags: [Announcements]
+      summary: Update announcement
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                body:
+                  type: string
+                announcement_type:
+                  type: string
+                target:
+                  type: string
+                target_org_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                is_dismissible:
+                  type: boolean
+                is_pinned:
+                  type: boolean
+                action_url:
+                  type: string
+                action_label:
+                  type: string
+                starts_at:
+                  type: string
+                  format: date-time
+                ends_at:
+                  type: string
+                  format: date-time
+      responses:
+        "200":
+          description: Announcement updated
+    delete:
+      tags: [Announcements]
+      summary: Delete announcement
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "204":
+          description: Announcement deleted
+
+  /api/v1/announcements/{id}/publish:
+    post:
+      tags: [Announcements]
+      summary: Publish an announcement
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "200":
+          description: Announcement published
+
+  /api/v1/announcements/{id}/unpublish:
+    post:
+      tags: [Announcements]
+      summary: Unpublish an announcement
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "200":
+          description: Announcement unpublished
+
+  # ===========================================================================
+  # DOWNLOADS
+  # ===========================================================================
+  /api/v1/downloads:
+    get:
+      tags: [Downloads]
+      summary: List download records
+      parameters:
+        - $ref: '#/components/parameters/QueryPage'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - name: release_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: organization_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Download records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      description: "Download record with release info"
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  /api/v1/downloads/stats:
+    get:
+      tags: [Downloads]
+      summary: Download statistics
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: group_by
+          in: query
+          schema:
+            type: string
+            enum: [day, week, month, version, platform]
+            default: day
+      responses:
+        "200":
+          description: Download stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_downloads:
+                    type: integer
+                  completed_downloads:
+                    type: integer
+                  unique_organizations:
+                    type: integer
+                  breakdown:
+                    type: array
+                    items:
+                      type: object
+
+  # ===========================================================================
+  # SUPPORT TICKETS
+  # ===========================================================================
+  /api/v1/support/tickets:
+    get:
+      tags: [Support]
+      summary: List support tickets
+      parameters:
+        - $ref: '#/components/parameters/QueryPage'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - $ref: '#/components/parameters/QuerySearch'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, in_progress, waiting_on_customer, waiting_on_internal, resolved, closed]
+        - name: priority
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+        - name: assigned_to
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: organization_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tickets list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SupportTicket'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      tags: [Support]
+      summary: Create support ticket (admin-created)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requester_name, requester_email, subject, description]
+              properties:
+                organization_id:
+                  type: string
+                  format: uuid
+                contact_id:
+                  type: string
+                  format: uuid
+                license_id:
+                  type: string
+                  format: uuid
+                requester_name:
+                  type: string
+                requester_email:
+                  type: string
+                  format: email
+                subject:
+                  type: string
+                description:
+                  type: string
+                category:
+                  type: string
+                  default: general
+                priority:
+                  type: string
+                  enum: [low, medium, high, critical]
+                  default: medium
+                assigned_to:
+                  type: string
+                  format: uuid
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "201":
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportTicket'
+
+  /api/v1/support/tickets/{id}:
+    get:
+      tags: [Support]
+      summary: Get ticket details with messages
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "200":
+          description: Ticket with messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportTicket'
+    patch:
+      tags: [Support]
+      summary: Update ticket
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [open, in_progress, waiting_on_customer, waiting_on_internal, resolved, closed]
+                priority:
+                  type: string
+                  enum: [low, medium, high, critical]
+                assigned_to:
+                  type: string
+                  format: uuid
+                category:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+                resolution:
+                  type: string
+      responses:
+        "200":
+          description: Ticket updated
+
+  /api/v1/support/tickets/{id}/messages:
+    post:
+      tags: [Support]
+      summary: Add message to ticket
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                  description: "Markdown content"
+                is_internal:
+                  type: boolean
+                  default: false
+                  description: "Internal note (not visible to customer)"
+      responses:
+        "201":
+          description: Message added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketMessage'
+
+  /api/v1/support/tickets/{id}/close:
+    post:
+      tags: [Support]
+      summary: Close a ticket
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                resolution:
+                  type: string
+      responses:
+        "200":
+          description: Ticket closed
+
+  /api/v1/support/stats:
+    get:
+      tags: [Support]
+      summary: Support ticket statistics
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Support stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_open:
+                    type: integer
+                  total_in_progress:
+                    type: integer
+                  avg_resolution_hours:
+                    type: number
+                  avg_first_response_hours:
+                    type: number
+                  by_priority:
+                    type: object
+                  by_category:
+                    type: object
+
+  # ===========================================================================
+  # INVOICES
+  # ===========================================================================
+  /api/v1/invoices:
+    get:
+      tags: [Invoices]
+      summary: List invoices
+      parameters:
+        - $ref: '#/components/parameters/QueryPage'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, sent, paid, overdue, cancelled, refunded]
+        - name: organization_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Invoices list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Invoice'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      tags: [Invoices]
+      summary: Create invoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organization_id, line_items]
+              properties:
+                organization_id:
+                  type: string
+                  format: uuid
+                license_id:
+                  type: string
+                  format: uuid
+                contact_id:
+                  type: string
+                  format: uuid
+                currency:
+                  type: string
+                  default: INR
+                tax_rate:
+                  type: number
+                  description: "e.g. 18.00 for 18% GST"
+                discount_amount:
+                  type: number
+                  default: 0
+                line_items:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [description, quantity, unit_price]
+                    properties:
+                      description:
+                        type: string
+                      quantity:
+                        type: integer
+                      unit_price:
+                        type: number
+                      license_type:
+                        type: string
+                      period:
+                        type: string
+                notes:
+                  type: string
+                terms:
+                  type: string
+                due_at:
+                  type: string
+                  format: date
+      responses:
+        "201":
+          description: Invoice created (draft)
+
+  /api/v1/invoices/{id}:
+    get:
+      tags: [Invoices]
+      summary: Get invoice details
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "200":
+          description: Invoice details
+    patch:
+      tags: [Invoices]
+      summary: Update invoice (draft only)
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                line_items:
+                  type: array
+                  items:
+                    type: object
+                tax_rate:
+                  type: number
+                discount_amount:
+                  type: number
+                notes:
+                  type: string
+                terms:
+                  type: string
+                due_at:
+                  type: string
+                  format: date
+      responses:
+        "200":
+          description: Invoice updated
+        "409":
+          description: Cannot update non-draft invoice
+
+  /api/v1/invoices/{id}/send:
+    post:
+      tags: [Invoices]
+      summary: Mark invoice as sent
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "200":
+          description: Invoice marked as sent
+
+  /api/v1/invoices/{id}/record-payment:
+    post:
+      tags: [Invoices]
+      summary: Record payment for invoice
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, payment_method]
+              properties:
+                amount:
+                  type: number
+                payment_method:
+                  type: string
+                payment_reference:
+                  type: string
+      responses:
+        "200":
+          description: Payment recorded
+
+  /api/v1/invoices/{id}/pdf:
+    get:
+      tags: [Invoices]
+      summary: Download invoice PDF
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "200":
+          description: PDF file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
+  # ===========================================================================
+  # ADMIN USER MANAGEMENT
+  # ===========================================================================
+  /api/v1/admin/users:
+    get:
+      tags: [Admin]
+      summary: List admin users
+      parameters:
+        - $ref: '#/components/parameters/QueryPage'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [super_admin, admin, support, viewer, analyst]
+        - name: is_active
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Admin users list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminUser'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+    post:
+      tags: [Admin]
+      summary: Create admin user
+      description: "Requires super_admin role."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, username, password, display_name, role]
+              properties:
+                email:
+                  type: string
+                  format: email
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 32
+                password:
+                  type: string
+                  minLength: 12
+                display_name:
+                  type: string
+                role:
+                  type: string
+                  enum: [admin, support, viewer, analyst]
+      responses:
+        "201":
+          description: Admin user created
+        "409":
+          description: Email or username already taken
+
+  /api/v1/admin/users/{id}:
+    get:
+      tags: [Admin]
+      summary: Get admin user details
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "200":
+          description: Admin user details
+    patch:
+      tags: [Admin]
+      summary: Update admin user
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name:
+                  type: string
+                role:
+                  type: string
+                  enum: [admin, support, viewer, analyst]
+                is_active:
+                  type: boolean
+      responses:
+        "200":
+          description: Admin user updated
+    delete:
+      tags: [Admin]
+      summary: Soft-delete admin user
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "204":
+          description: Admin user deleted
+
+  /api/v1/admin/users/{id}/reset-password:
+    post:
+      tags: [Admin]
+      summary: Force reset admin password
+      description: "Requires super_admin role."
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_password]
+              properties:
+                new_password:
+                  type: string
+                  minLength: 12
+      responses:
+        "200":
+          description: Password reset
+
+  /api/v1/admin/users/{id}/mfa:
+    post:
+      tags: [Admin]
+      summary: Enable or reset MFA for admin user
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "200":
+          description: MFA setup response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secret:
+                    type: string
+                  qr_code_url:
+                    type: string
+                    format: uri
+                  backup_codes:
+                    type: array
+                    items:
+                      type: string
+    delete:
+      tags: [Admin]
+      summary: Disable MFA for admin user
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        "200":
+          description: MFA disabled
+
+  /api/v1/admin/audit-log:
+    get:
+      tags: [Admin]
+      summary: Query admin audit log
+      parameters:
+        - $ref: '#/components/parameters/QueryPage'
+        - $ref: '#/components/parameters/QueryPerPage'
+        - name: admin_user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: resource_type
+          in: query
+          schema:
+            type: string
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        admin_user_id:
+                          type: string
+                          format: uuid
+                        admin_email:
+                          type: string
+                        action:
+                          type: string
+                        resource_type:
+                          type: string
+                        resource_id:
+                          type: string
+                        description:
+                          type: string
+                        changes:
+                          type: object
+                        ip_address:
+                          type: string
+                        created_at:
+                          type: string
+                          format: date-time
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  # ===========================================================================
+  # DASHBOARD
+  # ===========================================================================
+  /api/v1/dashboard/stats:
+    get:
+      tags: [Dashboard]
+      summary: Dashboard overview statistics
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStats'
+
+  /api/v1/dashboard/activity:
+    get:
+      tags: [Dashboard]
+      summary: Recent activity feed
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          description: "license_event, ticket, download, etc."
+                        title:
+                          type: string
+                        description:
+                          type: string
+                        resource_type:
+                          type: string
+                        resource_id:
+                          type: string
+                        timestamp:
+                          type: string
+                          format: date-time
+
+  # ===========================================================================
+  # PART B: Public Desktop App API
+  # ===========================================================================
+
+  /api/public/v1/license/activate:
+    post:
+      tags: [Public - License]
+      summary: Activate license on a machine
+      security: []
+      description: |
+        Called by the desktop app when a user enters their license key.
+        Binds the license to the machine's hardware fingerprint.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicActivateRequest'
+      responses:
+        "200":
+          description: Activation successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicActivateResponse'
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error_code:
+                    type: string
+                    enum:
+                      - INVALID_LICENSE_KEY
+                      - LICENSE_EXPIRED
+                      - LICENSE_SUSPENDED
+                      - LICENSE_REVOKED
+                      - MAX_ACTIVATIONS_REACHED
+                      - MACHINE_ALREADY_ACTIVATED
+                  message:
+                    type: string
+        "429":
+          description: Rate limited
+
+  /api/public/v1/license/validate:
+    post:
+      tags: [Public - License]
+      summary: Validate license on current machine
+      security: []
+      description: |
+        Called by the desktop app on startup and periodically to verify
+        the license is still valid for this machine.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicValidateRequest'
+      responses:
+        "200":
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicValidateResponse'
+        "400":
+          description: Invalid request
+
+  /api/public/v1/license/deactivate:
+    post:
+      tags: [Public - License]
+      summary: Deactivate license from current machine
+      security: []
+      description: |
+        Called when user wants to transfer their license to another machine.
+        Frees up an activation slot.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [license_key, machine_id]
+              properties:
+                license_key:
+                  type: string
+                machine_id:
+                  type: string
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Deactivation successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  activations_remaining:
+                    type: integer
+                  message:
+                    type: string
+        "400":
+          description: Not activated on this machine
+
+  /api/public/v1/heartbeat:
+    post:
+      tags: [Public - Telemetry]
+      summary: Periodic heartbeat from desktop app
+      security: []
+      description: |
+        Sent periodically (every 4 hours by default) by the desktop app.
+        Updates last_heartbeat, collects optional metrics, and can return
+        server-side commands (force update, show announcement, revoke).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicHeartbeatRequest'
+      responses:
+        "200":
+          description: Heartbeat acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicHeartbeatResponse'
+        "401":
+          description: Invalid license key
+
+  /api/public/v1/analytics:
+    post:
+      tags: [Public - Telemetry]
+      summary: Submit usage analytics from desktop app
+      security: []
+      description: |
+        Accepts a batch of analytics events from the desktop app.
+        Events are queued for async processing.
+        Max 100 events per batch.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [license_key, machine_id, events]
+              properties:
+                license_key:
+                  type: string
+                machine_id:
+                  type: string
+                session_id:
+                  type: string
+                app_version:
+                  type: string
+                os_platform:
+                  type: string
+                os_version:
+                  type: string
+                events:
+                  type: array
+                  maxItems: 100
+                  items:
+                    type: object
+                    required: [event_name, timestamp]
+                    properties:
+                      event_name:
+                        type: string
+                      event_category:
+                        type: string
+                      event_data:
+                        type: object
+                      timestamp:
+                        type: string
+                        format: date-time
+      responses:
+        "202":
+          description: Events accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted:
+                    type: integer
+                  message:
+                    type: string
+        "400":
+          description: Invalid payload
+        "429":
+          description: Rate limited
+
+  /api/public/v1/update-check:
+    post:
+      tags: [Public - Updates]
+      summary: Check for application updates
+      security: []
+      description: |
+        Called by the desktop app to check if a newer version is available.
+        Returns download URL and metadata if an update exists.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicUpdateCheckRequest'
+      responses:
+        "200":
+          description: Update check result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicUpdateCheckResponse'
+
+  /api/public/v1/announcements:
+    get:
+      tags: [Public - Content]
+      summary: Get active announcements for desktop app
+      security: []
+      parameters:
+        - name: app_version
+          in: query
+          schema:
+            type: string
+        - name: platform
+          in: query
+          schema:
+            type: string
+        - name: license_key
+          in: query
+          schema:
+            type: string
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+            description: "Only return announcements created/updated after this time"
+      responses:
+        "200":
+          description: Active announcements
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  announcements:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PublicAnnouncementItem'
+
+  /api/public/v1/download/{releaseId}/{platform}:
+    get:
+      tags: [Public - Downloads]
+      summary: Download a release binary
+      security: []
+      description: |
+        Serves the installer/binary for the requested release and platform.
+        Tracks the download. Returns a redirect to the actual file URL (S3/R2
+        presigned URL) or streams the file directly for local storage.
+      parameters:
+        - name: releaseId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: platform
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [windows_x64, windows_arm64, linux_x64, linux_arm64, macos_x64, macos_arm64]
+        - name: license_key
+          in: query
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to download URL
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+            X-File-SHA256:
+              schema:
+                type: string
+            X-File-Size:
+              schema:
+                type: integer
+        "404":
+          description: Release or platform not found
+
+  /api/public/v1/support/ticket:
+    post:
+      tags: [Public - Support]
+      summary: Submit support ticket from desktop app
+      security: []
+      description: |
+        Allows the desktop app to submit a support ticket directly.
+        Attaches device info and optional log bundle.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [license_key, machine_id, subject, description, requester_name, requester_email]
+              properties:
+                license_key:
+                  type: string
+                machine_id:
+                  type: string
+                subject:
+                  type: string
+                description:
+                  type: string
+                requester_name:
+                  type: string
+                requester_email:
+                  type: string
+                  format: email
+                category:
+                  type: string
+                  default: general
+                app_version:
+                  type: string
+                os_info:
+                  type: string
+                device_info:
+                  type: string
+                  description: "JSON string"
+                log_bundle:
+                  type: string
+                  format: binary
+                  description: "Compressed log file (.zip)"
+      responses:
+        "201":
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ticket_number:
+                    type: string
+                  message:
+                    type: string
+        "400":
+          description: Invalid request
+        "429":
+          description: Rate limited

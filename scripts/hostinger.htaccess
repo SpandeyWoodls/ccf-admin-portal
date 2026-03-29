@@ -1,0 +1,66 @@
+# =============================================================================
+# CCF Admin Portal - Hostinger LiteSpeed Configuration
+# =============================================================================
+# Place in public_html/ on Hostinger.
+# Handles HTTPS redirect, API proxying, legacy PHP endpoint compatibility,
+# security headers, compression, caching, and SPA fallback.
+# =============================================================================
+
+# ─── Force HTTPS ─────────────────────────────────────────────────────────────
+
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+
+# ─── Legacy PHP endpoint compatibility (desktop app backward compat) ─────────
+# These rules map the old PHP API paths to the new Node.js REST endpoints
+# so existing desktop app installations continue to work without updates.
+
+RewriteRule ^api/activate\.php$ /api/v1/license/activate [L,QSA]
+RewriteRule ^api/validate\.php$ /api/v1/license/validate [L,QSA]
+RewriteRule ^api/deactivate\.php$ /api/v1/license/deactivate [L,QSA]
+RewriteRule ^api/heartbeat\.php$ /api/v1/heartbeat [L,QSA]
+RewriteRule ^api/health\.php$ /api/v1/health [L,QSA]
+RewriteRule ^api/announcements\.php$ /api/v1/announcements [L,QSA]
+RewriteRule ^api/update-check\.php$ /api/v1/update-check [L,QSA]
+RewriteRule ^api/trial-request\.php$ /api/v1/trial-request [L,QSA]
+RewriteRule ^api/trial-request-status\.php$ /api/v1/trial-request-status [L,QSA]
+RewriteRule ^api/support/create-ticket\.php$ /api/v1/support/create-ticket [L,QSA]
+RewriteRule ^api/support/ticket-status\.php$ /api/v1/support/ticket-status [L,QSA]
+RewriteRule ^api/support/ticket-details\.php$ /api/v1/support/ticket-details [L,QSA]
+RewriteRule ^api/support/reply-ticket\.php$ /api/v1/support/reply-ticket [L,QSA]
+
+# ─── Proxy /api/ to Node.js backend ─────────────────────────────────────────
+
+RewriteRule ^api/(.*)$ http://127.0.0.1:3001/api/$1 [P,L]
+
+# ─── Security headers ───────────────────────────────────────────────────────
+
+Header set X-Content-Type-Options "nosniff"
+Header set X-Frame-Options "DENY"
+Header set X-XSS-Protection "1; mode=block"
+Header set Referrer-Policy "strict-origin-when-cross-origin"
+
+# ─── Gzip compression ───────────────────────────────────────────────────────
+
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json
+</IfModule>
+
+# ─── Cache static assets (Vite hashed filenames) ────────────────────────────
+
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 year"
+</IfModule>
+
+# ─── SPA fallback ────────────────────────────────────────────────────────────
+# Serve index.html for all non-file, non-directory routes so the React
+# router can handle client-side navigation.
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]

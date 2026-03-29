@@ -1,0 +1,42 @@
+# =============================================================================
+# License Server Backward Compatibility
+# =============================================================================
+# Deployed to: license.cyberchakra.in/public_html/.htaccess
+#
+# Desktop app v1.x calls license.cyberchakra.in/api/*.php
+# This .htaccess redirects ALL requests to admin.cyberchakra.in
+# which hosts the actual Node.js API.
+#
+# Uses HTTP 307 for POST endpoints to preserve the request method.
+# (301/302 would cause POST to be changed to GET by HTTP clients.)
+# =============================================================================
+
+RewriteEngine On
+
+# Force HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+
+# ---- License endpoints (POST -- must use 307) ----
+RewriteRule ^api/activate\.php$           https://admin.cyberchakra.in/api/v1/license/activate [R=307,L,QSA]
+RewriteRule ^api/validate\.php$           https://admin.cyberchakra.in/api/v1/license/validate [R=307,L,QSA]
+RewriteRule ^api/deactivate\.php$         https://admin.cyberchakra.in/api/v1/license/deactivate [R=307,L,QSA]
+
+# ---- System endpoints ----
+RewriteRule ^api/heartbeat\.php$          https://admin.cyberchakra.in/api/v1/heartbeat [R=307,L,QSA]
+RewriteRule ^api/health\.php$             https://admin.cyberchakra.in/api/v1/health [R=307,L,QSA]
+RewriteRule ^api/announcements\.php$      https://admin.cyberchakra.in/api/v1/announcements [R=307,L,QSA]
+RewriteRule ^api/update-check\.php$       https://admin.cyberchakra.in/api/v1/update-check [R=307,L,QSA]
+
+# ---- Trial endpoints ----
+RewriteRule ^api/trial-request\.php$      https://admin.cyberchakra.in/api/v1/trial-request [R=307,L,QSA]
+RewriteRule ^api/trial-request-status\.php$ https://admin.cyberchakra.in/api/v1/trial-request-status [R=307,L,QSA]
+
+# ---- Support endpoints ----
+RewriteRule ^api/support/(.*)\.php$       https://admin.cyberchakra.in/api/v1/support/$1 [R=307,L,QSA]
+
+# ---- Catch-all: redirect any other API request ----
+RewriteRule ^api/(.*)$                    https://admin.cyberchakra.in/api/$1 [R=307,L,QSA]
+
+# ---- Non-API: redirect to admin portal ----
+RewriteRule ^(.*)$                        https://admin.cyberchakra.in/$1 [R=301,L]

@@ -1,0 +1,132 @@
+# =============================================================================
+# CCF Admin Portal - LiteSpeed/Apache Configuration
+# =============================================================================
+# Deployed to: admin.cyberchakra.in (public_html)
+# Handles seven responsibilities:
+#   1. HTTPS enforcement (HTTP -> HTTPS redirect)
+#   2. Security headers (HSTS, CSP, X-Frame-Options, etc.)
+#   3. Legacy PHP endpoint rewrites (desktop app v1.x backward compat)
+#   4. API proxy to Node.js backend on port 3001
+#   5. React SPA fallback routing
+#   6. Compression (gzip/brotli)
+#   7. Static asset caching
+# =============================================================================
+
+# Enable rewrite engine
+RewriteEngine On
+
+# ---------------------------------------------------------------------------
+# 1. HTTPS Enforcement
+# ---------------------------------------------------------------------------
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+
+# ---------------------------------------------------------------------------
+# 2. Security Headers
+# ---------------------------------------------------------------------------
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://admin.cyberchakra.in; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# 3. Legacy PHP endpoint compatibility
+# ---------------------------------------------------------------------------
+# The desktop app (v1.x) calls .php endpoints. These rewrites transparently
+# redirect to the new Node.js API so existing installations keep working
+# without a client-side update.
+
+# License management
+RewriteRule ^api/activate\.php$                    /api/v1/license/activate [L,QSA]
+RewriteRule ^api/validate\.php$                    /api/v1/license/validate [L,QSA]
+RewriteRule ^api/deactivate\.php$                  /api/v1/license/deactivate [L,QSA]
+
+# System
+RewriteRule ^api/heartbeat\.php$                   /api/v1/heartbeat [L,QSA]
+RewriteRule ^api/health\.php$                      /api/v1/health [L,QSA]
+RewriteRule ^api/announcements\.php$               /api/v1/announcements [L,QSA]
+RewriteRule ^api/update-check\.php$                /api/v1/update-check [L,QSA]
+
+# Trial requests
+RewriteRule ^api/trial-request\.php$               /api/v1/trial-request [L,QSA]
+RewriteRule ^api/trial-request-status\.php$        /api/v1/trial-request-status [L,QSA]
+
+# Support tickets
+RewriteRule ^api/support/create-ticket\.php$       /api/v1/support/create-ticket [L,QSA]
+RewriteRule ^api/support/ticket-status\.php$       /api/v1/support/ticket-status [L,QSA]
+RewriteRule ^api/support/ticket-details\.php$      /api/v1/support/ticket-details [L,QSA]
+RewriteRule ^api/support/reply-ticket\.php$        /api/v1/support/reply-ticket [L,QSA]
+
+# ---------------------------------------------------------------------------
+# 4. Proxy all /api/* requests to the Node.js backend
+# ---------------------------------------------------------------------------
+RewriteRule ^api/(.*)$ http://127.0.0.1:3001/api/$1 [P,L]
+
+# ---------------------------------------------------------------------------
+# 5. SPA fallback for React Router
+# ---------------------------------------------------------------------------
+# If the requested file or directory does not exist on disk, serve index.html
+# so React Router can handle the route on the client side.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]
+
+# ---------------------------------------------------------------------------
+# 6. Compression (Gzip / Brotli)
+# ---------------------------------------------------------------------------
+# LiteSpeed handles Brotli natively. These enable gzip as fallback.
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE text/javascript
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/json
+    AddOutputFilterByType DEFLATE application/xml
+    AddOutputFilterByType DEFLATE text/xml
+    AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# 7. Static Asset Caching
+# ---------------------------------------------------------------------------
+# Vite hashes filenames, so hashed assets can be cached for 1 year.
+# index.html must NOT be cached so users always get the latest SPA shell.
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresDefault "access plus 0 seconds"
+    ExpiresByType text/html "access plus 0 seconds"
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType text/javascript "access plus 1 year"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+    ExpiresByType image/x-icon "access plus 1 year"
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+    ExpiresByType application/font-woff2 "access plus 1 year"
+</IfModule>
+
+<IfModule mod_headers.c>
+    <FilesMatch "\.(js|css|woff|woff2|ttf|eot|svg|png|jpg|jpeg|gif|ico)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+    <FilesMatch "\.html$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# 8. Deny Access to Sensitive Files
+# ---------------------------------------------------------------------------
+<FilesMatch "(\.env|\.git|\.htpasswd|composer\.json|package\.json|tsconfig\.json)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>

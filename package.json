@@ -1,0 +1,19 @@
+{
+  "name": "ccf-admin-portal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Admin Portal for Cyber Chakra Forensics",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "build": "cd frontend && npm run build && cd ../backend && npm run build",
+    "install:all": "cd frontend && npm install && cd ../backend && npm install",
+    "db:push": "cd backend && npx prisma db push",
+    "db:seed": "cd backend && npx tsx src/seed.ts",
+    "db:studio": "cd backend && npx prisma studio"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

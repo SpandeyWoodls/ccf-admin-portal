@@ -1,0 +1,178 @@
+name: Deploy to Production
+
+# Production deploys are MANUAL ONLY. Staging auto-deploys via ci.yml.
+# This workflow requires typing "DEPLOY TO PRODUCTION" to confirm.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_production:
+        description: 'Type "DEPLOY TO PRODUCTION" to confirm'
+        required: true
+        type: string
+
+jobs:
+  # ─── Safety gate: require explicit confirmation ────────────────────────────
+  validate-confirmation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate confirmation string
+        run: |
+          if [ "${{ github.event.inputs.confirm_production }}" != "DEPLOY TO PRODUCTION" ]; then
+            echo "ERROR: Production deployment not confirmed."
+            echo "You must type 'DEPLOY TO PRODUCTION' exactly to proceed."
+            exit 1
+          fi
+          echo "Production deployment confirmed by ${{ github.actor }} at $(date -u)"
+
+  # ─── Build, verify, and deploy ─────────────────────────────────────────────
+  deploy-production:
+    needs: validate-confirmation
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: docs/admin-portal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          cd frontend && npm ci
+          cd ../backend && npm ci
+
+      - name: Generate Prisma client
+        run: cd backend && npx prisma generate
+
+      # Re-run type checks as a safety gate
+      - name: TypeScript check (safety gate)
+        run: |
+          cd frontend && npx tsc --noEmit
+          cd ../backend && npx tsc --noEmit
+
+      - name: Build frontend (production)
+        env:
+          VITE_API_URL: "https://admin.cyberchakra.in"
+        run: |
+          cd frontend
+          echo "VITE_API_URL=\"https://admin.cyberchakra.in\"" > .env
+          npm run build
+
+      - name: Build backend
+        run: cd backend && npm run build
+
+      - name: Prepare deployment package
+        run: |
+          mkdir -p deploy/public_html deploy/backend deploy/license_public_html
+
+          # Frontend static files
+          cp -r frontend/dist/* deploy/public_html/
+
+          # .htaccess for admin subdomain (production uses port 3001)
+          cp .htaccess deploy/public_html/.htaccess
+
+          # License subdomain .htaccess (if exists)
+          if [ -f .htaccess.license ]; then
+            cp .htaccess.license deploy/license_public_html/.htaccess
+          fi
+
+          # Backend compiled files + dependencies
+          cp -r backend/dist deploy/backend/dist
+          cp -r backend/node_modules deploy/backend/node_modules
+          cp -r backend/prisma deploy/backend/prisma
+          cp backend/package.json deploy/backend/
+
+      - name: Create pre-deployment backup on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOSTINGER_HOST }}
+          username: ${{ secrets.HOSTINGER_USER }}
+          key: ${{ secrets.HOSTINGER_SSH_KEY }}
+          script: |
+            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            mkdir -p ~/backups/app
+
+            # Backup current frontend
+            tar -czf ~/backups/app/public_html_${TIMESTAMP}.tar.gz \
+              -C ~/domains/admin.cyberchakra.in/public_html . 2>/dev/null || echo "No existing public_html to backup"
+
+            # Backup current backend dist
+            tar -czf ~/backups/app/backend_dist_${TIMESTAMP}.tar.gz \
+              -C ~/admin-portal/backend/dist . 2>/dev/null || echo "No existing backend dist to backup"
+
+            # Keep only last 5 backups
+            ls -1t ~/backups/app/public_html_*.tar.gz 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null || true
+            ls -1t ~/backups/app/backend_dist_*.tar.gz 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null || true
+
+            echo "Pre-deploy backup created: ${TIMESTAMP}"
+
+      - name: Deploy files to Hostinger via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HOSTINGER_HOST }}
+          username: ${{ secrets.HOSTINGER_USER }}
+          key: ${{ secrets.HOSTINGER_SSH_KEY }}
+          source: "docs/admin-portal/deploy/*"
+          target: "/home/${{ secrets.HOSTINGER_USER }}/deploy_staging"
+          strip_components: 4
+
+      - name: Apply deployment and restart
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOSTINGER_HOST }}
+          username: ${{ secrets.HOSTINGER_USER }}
+          key: ${{ secrets.HOSTINGER_SSH_KEY }}
+          script: |
+            set -e
+
+            ADMIN_PUBLIC="$HOME/domains/admin.cyberchakra.in/public_html"
+            LICENSE_PUBLIC="$HOME/domains/license.cyberchakra.in/public_html"
+            BACKEND="$HOME/admin-portal/backend"
+
+            # Deploy frontend (atomic via rsync)
+            rsync -a --delete ~/deploy_staging/public_html/ "$ADMIN_PUBLIC/"
+            echo "Frontend deployed to $ADMIN_PUBLIC"
+
+            # Deploy license subdomain .htaccess (if present)
+            if [ -f ~/deploy_staging/license_public_html/.htaccess ]; then
+              mkdir -p "$LICENSE_PUBLIC"
+              cp ~/deploy_staging/license_public_html/.htaccess "$LICENSE_PUBLIC/.htaccess"
+              echo "License .htaccess deployed"
+            fi
+
+            # Deploy backend
+            mkdir -p "$BACKEND"
+            rsync -a --delete ~/deploy_staging/backend/dist/ "$BACKEND/dist/"
+            rsync -a ~/deploy_staging/backend/node_modules/ "$BACKEND/node_modules/"
+            rsync -a ~/deploy_staging/backend/prisma/ "$BACKEND/prisma/"
+            cp ~/deploy_staging/backend/package.json "$BACKEND/package.json"
+            echo "Backend deployed to $BACKEND"
+
+            # Run safe database migration (only adds, never drops)
+            cd "$BACKEND"
+            npx prisma db push --accept-data-loss=false
+            echo "Database schema updated"
+
+            # Restart Node.js (touch triggers hPanel manager restart)
+            touch "$BACKEND/dist/index.js"
+            echo "Node.js restart triggered"
+
+            # Clean up staging directory
+            rm -rf ~/deploy_staging
+
+            # Wait for startup
+            sleep 5
+
+            # Health check
+            HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 https://admin.cyberchakra.in/api/v1/health 2>/dev/null || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "Health check PASSED (HTTP 200)"
+            else
+              echo "Health check FAILED (HTTP $HTTP_CODE) -- check server logs immediately"
+              exit 1
+            fi
+
+            echo "Production deployment complete at $(date)"

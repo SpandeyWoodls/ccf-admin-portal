@@ -1,0 +1,37 @@
+# =============================================================================
+# CCF Admin Portal - Local Development Database
+# =============================================================================
+# Usage:
+#   docker compose up -d        Start MySQL in the background
+#   docker compose down          Stop MySQL (data persists in volume)
+#   docker compose down -v       Stop MySQL and delete all data
+# =============================================================================
+
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: ccf-admin-mysql-dev
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: ccf_admin_dev
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command:
+      # Performance and compatibility defaults for local development
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mysql_data:
+    driver: local

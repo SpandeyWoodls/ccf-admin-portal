@@ -1,0 +1,157 @@
+name: CI
+
+on:
+  push:
+    paths:
+      - 'docs/admin-portal/**'
+  pull_request:
+    paths:
+      - 'docs/admin-portal/**'
+
+jobs:
+  lint-and-typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs/admin-portal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            docs/admin-portal/frontend/package-lock.json
+            docs/admin-portal/backend/package-lock.json
+
+      - name: Install frontend deps
+        run: cd frontend && npm ci
+
+      - name: Install backend deps
+        run: cd backend && npm ci
+
+      - name: Generate Prisma client
+        run: cd backend && npx prisma generate
+
+      - name: TypeScript check (frontend)
+        run: cd frontend && npx tsc --noEmit
+
+      - name: TypeScript check (backend)
+        run: cd backend && npx tsc --noEmit
+
+      - name: Validate env template completeness
+        run: |
+          REQUIRED_VARS="DATABASE_URL JWT_SECRET JWT_REFRESH_SECRET CCF_HMAC_SECRET PORT CORS_ORIGIN NODE_ENV"
+          for var in $REQUIRED_VARS; do
+            if ! grep -q "^${var}=" backend/.env.example; then
+              echo "ERROR: $var missing from backend/.env.example"
+              exit 1
+            fi
+          done
+          echo "All required variables documented in .env.example"
+
+      - name: Build frontend
+        run: cd frontend && npm run build
+
+      - name: Build backend
+        run: cd backend && npm run build
+
+  security-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs/admin-portal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Audit frontend
+        run: cd frontend && npm audit --production || true
+
+      - name: Audit backend
+        run: cd backend && npm audit --production || true
+
+  # ---------------------------------------------------------------------------
+  # Auto-deploy to staging on push to main (after CI passes)
+  # ---------------------------------------------------------------------------
+  deploy-staging:
+    needs: [lint-and-typecheck, security-audit]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: staging
+    defaults:
+      run:
+        working-directory: docs/admin-portal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          cd frontend && npm ci
+          cd ../backend && npm ci
+
+      - name: Generate Prisma client
+        run: cd backend && npx prisma generate
+
+      - name: Build frontend (staging)
+        env:
+          VITE_API_URL: "https://admin-staging.cyberchakra.in"
+        run: cd frontend && npm run build
+
+      - name: Build backend
+        run: cd backend && npm run build
+
+      - name: Prepare staging deployment package
+        run: |
+          mkdir -p deploy/public_html deploy/backend
+          # Frontend static files
+          cp -r frontend/dist/* deploy/public_html/
+          # Backend compiled + runtime files
+          cp -r backend/dist deploy/backend/dist
+          cp -r backend/node_modules deploy/backend/node_modules
+          cp -r backend/prisma deploy/backend/prisma
+          cp backend/package.json deploy/backend/
+          # .htaccess with staging port (3002)
+          cp .htaccess deploy/public_html/.htaccess
+          sed -i 's/127\.0\.0\.1:3001/127.0.0.1:3002/g' deploy/public_html/.htaccess
+
+      - name: Deploy to staging via SSH
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HOSTINGER_HOST }}
+          username: ${{ secrets.HOSTINGER_USER }}
+          key: ${{ secrets.HOSTINGER_SSH_KEY }}
+          source: "docs/admin-portal/deploy/*"
+          target: "/home/${{ secrets.HOSTINGER_USER }}/admin-portal-staging"
+          strip_components: 4
+
+      - name: Apply schema and restart staging
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOSTINGER_HOST }}
+          username: ${{ secrets.HOSTINGER_USER }}
+          key: ${{ secrets.HOSTINGER_SSH_KEY }}
+          script: |
+            cd ~/admin-portal-staging/backend
+            # Apply schema changes (safe, non-destructive)
+            npx prisma db push --accept-data-loss=false
+            # Copy frontend to staging subdomain document root
+            cp -r ~/admin-portal-staging/public_html/* ~/domains/admin-staging.cyberchakra.in/public_html/ 2>/dev/null || true
+            # Restart staging Node.js process
+            npx pm2 restart ccf-admin-staging 2>/dev/null || npx pm2 start dist/index.js --name ccf-admin-staging
+            echo "Staging deployment complete at $(date)"
+
+      - name: Verify staging health
+        run: |
+          sleep 10
+          HTTP_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" https://admin-staging.cyberchakra.in/api/v1/health || echo "000")
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "Staging health check PASSED (HTTP 200)"
+          else
+            echo "WARNING: Staging health check returned HTTP $HTTP_STATUS"
+          fi
