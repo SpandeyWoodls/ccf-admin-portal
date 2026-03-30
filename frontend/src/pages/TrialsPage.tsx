@@ -110,23 +110,23 @@ function StatCard({
 }) {
   return (
     <Card>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-3">
+      <CardContent className="px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+              {label}
+            </p>
+            <p className="mt-0.5 text-xl font-bold text-[hsl(var(--foreground))]">
+              {value}
+            </p>
+          </div>
           <div
             className={cn(
-              "flex h-10 w-10 items-center justify-center rounded-lg",
+              "flex h-9 w-9 items-center justify-center rounded-lg",
               color,
             )}
           >
-            <Icon className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-[hsl(var(--foreground))]">
-              {value}
-            </p>
-            <p className="text-xs text-[hsl(var(--muted-foreground))]">
-              {label}
-            </p>
+            <Icon className="h-4 w-4" />
           </div>
         </div>
       </CardContent>
@@ -515,28 +515,34 @@ export function TrialsPage() {
             Review and manage incoming trial license requests.
           </p>
         </div>
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--card)/0.5)] py-20">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--muted))]">
-            <FlaskConical className="h-8 w-8 text-[hsl(var(--muted-foreground)/0.7)]" />
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--card)/0.5)] py-20 px-6">
+          <div className="relative mb-2">
+            <div className="absolute -inset-3 rounded-full bg-[hsl(var(--primary)/0.06)]" />
+            <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--muted))]">
+              <FlaskConical className="h-8 w-8 text-[hsl(var(--muted-foreground)/0.6)]" />
+            </div>
           </div>
           <h3 className="mt-4 text-lg font-semibold text-[hsl(var(--foreground))]">
             No trial requests yet
           </h3>
-          <p className="mt-1.5 max-w-sm text-center text-sm text-[hsl(var(--muted-foreground))]">
+          <p className="mt-2 max-w-md text-center text-sm leading-relaxed text-[hsl(var(--muted-foreground))]">
             {error
               ? "Could not connect to the server. Trial requests will appear here once the backend is available."
-              : "Trial requests will appear here when users request from the desktop app."}
+              : "When users request trials from the CMF desktop app, they'll appear here for review."}
           </p>
           {!error && (
-            <p className="mt-3 max-w-xs text-center text-xs text-[hsl(var(--muted-foreground)/0.6)]">
-              You'll be able to approve, deny, or extend trials directly from this page.
-            </p>
+            <div className="mt-4 flex items-center gap-3 rounded-lg border border-[hsl(var(--border)/0.4)] bg-[hsl(var(--muted)/0.15)] px-4 py-3 max-w-sm">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-[hsl(var(--success)/0.6)]" />
+              <p className="text-xs text-[hsl(var(--muted-foreground)/0.7)]">
+                You'll be able to approve, reject, or extend trials directly from this page.
+              </p>
+            </div>
           )}
           {error && (
             <Button
               variant="outline"
               size="sm"
-              className="mt-4"
+              className="mt-5"
               onClick={() => fetchTrials({ page: 1, limit: 50 })}
             >
               Retry
@@ -570,23 +576,23 @@ export function TrialsPage() {
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] p-1">
+      {/* Pill-style tab bar */}
+      <div className="flex flex-wrap gap-2">
         {tabs.map((tab) => (
           <button
             key={tab.value}
             onClick={() => setActiveTab(tab.value)}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-200 cursor-pointer",
+              "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 cursor-pointer border",
               activeTab === tab.value
-                ? "bg-[hsl(var(--card))] text-[hsl(var(--foreground))] shadow-sm"
-                : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]",
+                ? "border-[hsl(var(--primary)/0.4)] bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))] shadow-sm shadow-[hsl(var(--primary)/0.1)]"
+                : "border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--primary)/0.3)] hover:text-[hsl(var(--foreground))]",
             )}
           >
             {tab.label}
             <span
               className={cn(
-                "rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                "inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold",
                 activeTab === tab.value
                   ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"
                   : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]",
@@ -650,16 +656,16 @@ export function TrialsPage() {
                     className="py-16 text-center"
                   >
                     <div className="flex flex-col items-center gap-2">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--muted)/0.7)]">
-                        <FileText className="h-6 w-6 text-[hsl(var(--muted-foreground)/0.6)]" />
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--muted)/0.5)]">
+                        <FlaskConical className="h-6 w-6 text-[hsl(var(--muted-foreground)/0.5)]" />
                       </div>
-                      <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
-                        No trial requests found
+                      <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+                        No matching requests
                       </p>
-                      <p className="text-xs text-[hsl(var(--muted-foreground)/0.7)]">
+                      <p className="text-xs text-[hsl(var(--muted-foreground))]">
                         {search
-                          ? "Try adjusting your search query."
-                          : "New requests will appear here."}
+                          ? "Try adjusting your search query or changing the status filter."
+                          : "No requests in this category yet."}
                       </p>
                     </div>
                   </TableCell>
@@ -732,22 +738,24 @@ export function TrialsPage() {
                             }
                           >
                             <div
-                              className="flex items-center gap-1"
+                              className="flex items-center gap-1.5"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <Button
                                 size="sm"
-                                className="h-7 bg-[hsl(var(--success))] px-2 text-[11px] text-white hover:bg-[hsl(var(--success)/0.9)]"
+                                className="h-7 gap-1 bg-[hsl(var(--success))] px-2.5 text-[11px] font-semibold text-white hover:bg-[hsl(var(--success)/0.9)]"
                                 onClick={() => openApproveDialog(trial)}
                               >
+                                <CheckCircle2 className="h-3 w-3" />
                                 Approve
                               </Button>
                               <Button
                                 variant="destructive"
                                 size="sm"
-                                className="h-7 px-2 text-[11px]"
+                                className="h-7 gap-1 px-2.5 text-[11px] font-semibold"
                                 onClick={() => openRejectDialog(trial)}
                               >
+                                <XCircle className="h-3 w-3" />
                                 Reject
                               </Button>
                             </div>

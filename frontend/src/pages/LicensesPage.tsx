@@ -12,10 +12,12 @@ import {
   RefreshCw,
   FileX2,
   Layers,
+  Copy,
+  Check,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -52,23 +54,23 @@ import { useCan } from "@/lib/rbac";
 
 const statusConfig: Record<
   string,
-  { label: string; variant: "success" | "destructive" | "warning" | "default" | "secondary" }
+  { label: string; variant: "success" | "destructive" | "warning" | "default" | "secondary"; dotColor: string; pillBg: string; pillText: string }
 > = {
-  active: { label: "Active", variant: "success" },
-  expired: { label: "Expired", variant: "destructive" },
-  suspended: { label: "Suspended", variant: "warning" },
-  revoked: { label: "Revoked", variant: "destructive" },
-  issued: { label: "Issued", variant: "secondary" },
+  active: { label: "Active", variant: "success", dotColor: "bg-emerald-500", pillBg: "bg-emerald-50 dark:bg-emerald-900/30", pillText: "text-emerald-700 dark:text-emerald-300" },
+  expired: { label: "Expired", variant: "destructive", dotColor: "bg-red-400", pillBg: "bg-red-50 dark:bg-red-900/30", pillText: "text-red-700 dark:text-red-300" },
+  suspended: { label: "Suspended", variant: "warning", dotColor: "bg-amber-500", pillBg: "bg-amber-50 dark:bg-amber-900/30", pillText: "text-amber-700 dark:text-amber-300" },
+  revoked: { label: "Revoked", variant: "destructive", dotColor: "bg-red-500", pillBg: "bg-red-50 dark:bg-red-900/30", pillText: "text-red-700 dark:text-red-300" },
+  issued: { label: "Issued", variant: "secondary", dotColor: "bg-slate-400", pillBg: "bg-slate-50 dark:bg-slate-800/50", pillText: "text-slate-600 dark:text-slate-300" },
 };
 
 const tierConfig: Record<
   string,
-  { label: string; variant: "default" | "secondary" | "outline" }
+  { label: string; variant: "default" | "secondary" | "outline"; color: string }
 > = {
-  enterprise: { label: "Enterprise", variant: "default" },
-  team: { label: "Team", variant: "secondary" },
-  individual: { label: "Individual", variant: "outline" },
-  government: { label: "Government", variant: "default" },
+  enterprise: { label: "Enterprise", variant: "default", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-purple-200 dark:border-purple-800" },
+  team: { label: "Team", variant: "secondary", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200 dark:border-blue-800" },
+  individual: { label: "Individual", variant: "outline", color: "bg-gray-100 text-gray-600 dark:bg-gray-800/60 dark:text-gray-400 border-gray-200 dark:border-gray-700" },
+  government: { label: "Government", variant: "default", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800" },
 };
 
 // ---------------------------------------------------------------------------
@@ -83,6 +85,7 @@ export function LicensesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const perPage = 10;
 
   const canSuspend = useCan("licenses.suspend");
@@ -130,10 +133,10 @@ export function LicensesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))]">
+          <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--foreground))]">
             Licenses
           </h1>
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">
+          <p className="mt-0.5 text-sm text-[hsl(var(--muted-foreground))]">
             Manage software license keys and activations.
           </p>
         </div>
@@ -163,7 +166,7 @@ export function LicensesPage() {
                 placeholder="Search by key or organization..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
+                className="pl-9 transition-shadow focus:shadow-md focus:shadow-[hsl(var(--ring)/0.1)]"
               />
             </div>
             <Select
@@ -288,19 +291,48 @@ export function LicensesPage() {
                   const status = statusConfig[lic.status] || {
                     label: lic.status,
                     variant: "secondary" as const,
+                    dotColor: "bg-slate-400",
+                    pillBg: "bg-slate-50 dark:bg-slate-800/50",
+                    pillText: "text-slate-600 dark:text-slate-300",
                   };
                   const tier = tierConfig[lic.tier] || {
                     label: lic.tier,
                     variant: "outline" as const,
+                    color: "bg-gray-100 text-gray-600 dark:bg-gray-800/60 dark:text-gray-400 border-gray-200 dark:border-gray-700",
                   };
+                  const activationPct = lic.maxActivations > 0
+                    ? Math.min((lic.currentActivations / lic.maxActivations) * 100, 100)
+                    : 0;
+                  const isCopied = copiedId === lic.id;
                   return (
                     <TableRow
                       key={lic.id}
-                      className="cursor-pointer"
+                      className="group cursor-pointer odd:bg-[hsl(var(--muted)/0.3)] transition-colors hover:bg-[hsl(var(--muted)/0.6)]"
                       onClick={() => navigate(`/licenses/${lic.id}`)}
                     >
-                      <TableCell className="font-mono text-xs font-medium">
-                        {maskLicenseKey(lic.licenseKey)}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-medium tracking-wide">
+                            {maskLicenseKey(lic.licenseKey)}
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(lic.licenseKey);
+                              setCopiedId(lic.id);
+                              toast.success("License key copied");
+                              setTimeout(() => setCopiedId(null), 2000);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-[hsl(var(--muted))]"
+                            title="Copy license key"
+                          >
+                            {isCopied ? (
+                              <Check className="h-3 w-3 text-[hsl(var(--success))]" />
+                            ) : (
+                              <Copy className="h-3 w-3 text-[hsl(var(--muted-foreground))]" />
+                            )}
+                          </button>
+                        </div>
                       </TableCell>
                       <TableCell className="font-medium">
                         {lic.organization?.name || (
@@ -308,38 +340,60 @@ export function LicensesPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={tier.variant} className="text-[10px]">
+                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${tier.color}`}>
                           {tier.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={status.variant} className="text-[10px]">
-                          {status.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={cn(
-                            "text-sm",
-                            lic.currentActivations >= lic.maxActivations
-                              ? "text-[hsl(var(--warning))]"
-                              : "text-[hsl(var(--muted-foreground))]",
-                          )}
-                        >
-                          {lic.currentActivations}/{lic.maxActivations}
                         </span>
                       </TableCell>
-                      <TableCell className="text-sm text-[hsl(var(--muted-foreground))]">
-                        {lic.validUntil
-                          ? new Date(lic.validUntil).toLocaleDateString(
+                      <TableCell>
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${status.pillBg} ${status.pillText}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${status.dotColor}`} />
+                          {status.label}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <span
+                            className={cn(
+                              "text-sm font-medium",
+                              lic.currentActivations >= lic.maxActivations
+                                ? "text-[hsl(var(--warning))]"
+                                : "text-[hsl(var(--muted-foreground))]",
+                            )}
+                          >
+                            {lic.currentActivations}/{lic.maxActivations}
+                          </span>
+                          <div className="h-1 w-16 rounded-full bg-[hsl(var(--muted))]">
+                            <div
+                              className={cn(
+                                "h-1 rounded-full transition-all",
+                                activationPct >= 100
+                                  ? "bg-[hsl(var(--warning))]"
+                                  : activationPct >= 70
+                                    ? "bg-amber-400"
+                                    : "bg-[hsl(var(--primary))]",
+                              )}
+                              style={{ width: `${activationPct}%` }}
+                            />
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {lic.validUntil ? (
+                          <span className="text-[hsl(var(--muted-foreground))]">
+                            {new Date(lic.validUntil).toLocaleDateString(
                               "en-IN",
                               {
                                 day: "2-digit",
                                 month: "short",
                                 year: "numeric",
                               },
-                            )
-                          : "Perpetual"}
+                            )}
+                          </span>
+                        ) : (
+                          <span className="italic text-[hsl(var(--muted-foreground)/0.6)]">
+                            Perpetual
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -347,13 +401,13 @@ export function LicensesPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8"
+                              className="h-8 w-8 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -401,7 +455,7 @@ export function LicensesPage() {
                                     revokeLicense(lic.id);
                                   }
                                 }}
-                                className="text-[hsl(var(--destructive))]"
+                                className="text-[hsl(var(--destructive))] focus:text-[hsl(var(--destructive))]"
                               >
                                 <Ban className="mr-2 h-4 w-4" />
                                 Revoke
@@ -420,24 +474,25 @@ export function LicensesPage() {
 
       {/* Pagination */}
       {!isLoading && pagination.total > 0 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">
-            Showing {(currentPage - 1) * perPage + 1}-
-            {Math.min(currentPage * perPage, pagination.total)} of{" "}
-            {pagination.total} licenses
+        <div className="flex items-center justify-between rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-4 py-2.5">
+          <p className="text-xs text-[hsl(var(--muted-foreground))]">
+            <span className="font-medium text-[hsl(var(--foreground))]">
+              {(currentPage - 1) * perPage + 1}-{Math.min(currentPage * perPage, pagination.total)}
+            </span>
+            {" "}of {pagination.total}
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <Button
-              variant="outline"
-              size="sm"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((p) => p - 1)}
             >
               <ChevronLeft className="h-4 w-4" />
-              Previous
             </Button>
             {/* Page number indicators */}
-            <div className="hidden items-center gap-1 sm:flex">
+            <div className="hidden items-center gap-0.5 sm:flex">
               {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
                 let pageNum: number;
                 if (totalPages <= 5) {
@@ -454,7 +509,10 @@ export function LicensesPage() {
                     key={pageNum}
                     variant={currentPage === pageNum ? "default" : "ghost"}
                     size="sm"
-                    className="h-8 w-8 p-0"
+                    className={cn(
+                      "h-7 w-7 p-0 text-xs",
+                      currentPage === pageNum && "pointer-events-none",
+                    )}
                     onClick={() => setCurrentPage(pageNum)}
                   >
                     {pageNum}
@@ -463,12 +521,12 @@ export function LicensesPage() {
               })}
             </div>
             <Button
-              variant="outline"
-              size="sm"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage((p) => p + 1)}
             >
-              Next
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>

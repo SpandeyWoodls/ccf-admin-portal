@@ -266,23 +266,25 @@ function StatCard({
 }) {
   return (
     <Card>
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+      <CardContent className="px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/0.1)]">
+            <Icon className="h-4 w-4 text-[hsl(var(--primary))]" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--muted-foreground))] leading-none">
               {title}
             </p>
-            <p className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))]">
-              {value}
-            </p>
-            {description && (
-              <p className="text-xs text-[hsl(var(--muted-foreground))]">
-                {description}
+            <div className="flex items-baseline gap-2">
+              <p className="text-xl font-bold tracking-tight text-[hsl(var(--foreground))]">
+                {value}
               </p>
-            )}
-          </div>
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/0.1)]">
-            <Icon className="h-5 w-5 text-[hsl(var(--primary))]" />
+              {description && (
+                <p className="truncate text-[10px] text-[hsl(var(--muted-foreground))]">
+                  {description}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </CardContent>
@@ -581,7 +583,7 @@ function ReleaseCard({
   return (
     <Card
       className={cn(
-        "transition-all duration-200",
+        "transition-all duration-200 hover:shadow-md",
         status === "blocked" && "border-[hsl(var(--destructive)/0.3)]",
         release.forceUpdate &&
           status === "published" &&
@@ -591,89 +593,94 @@ function ReleaseCard({
       <CardContent className="p-0">
         {/* Main card content */}
         <div className="p-5">
-          {/* Row 1: Version, title, status */}
+          {/* Top section: version + badges + status */}
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-lg font-bold tracking-tight text-[hsl(var(--foreground))]">
-                v{release.version}
-              </span>
-              <span className="text-sm text-[hsl(var(--muted-foreground))]">
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className="text-xl font-extrabold tracking-tight text-[hsl(var(--foreground))]">
+                  v{release.version}
+                </span>
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded-md border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                    channelCfg.className
+                  )}
+                >
+                  {channelCfg.label}
+                </span>
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold",
+                    severityCfg.className
+                  )}
+                >
+                  {severityCfg.label}
+                </span>
+                {release.forceUpdate && (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
+                    <AlertTriangle className="h-3 w-3" />
+                    Force
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-[hsl(var(--muted-foreground))]">
                 {release.title}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span
+                className={cn(
+                  "inline-block h-2 w-2 rounded-full",
+                  statusCfg.dotColor
+                )}
+              />
+              <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">
+                {statusCfg.label}
               </span>
             </div>
-            <Badge variant={statusCfg.variant} className="text-[10px] gap-1.5">
-              <span
-                className={cn("inline-block h-1.5 w-1.5 rounded-full", statusCfg.dotColor)}
-              />
-              {statusCfg.label}
-            </Badge>
           </div>
 
-          {/* Row 2: Channel, severity, date, force update */}
-          <div className="mt-2.5 flex flex-wrap items-center gap-2">
-            <span
-              className={cn(
-                "inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold",
-                channelCfg.className
-              )}
-            >
-              {channelCfg.label}
-            </span>
-            <span
-              className={cn(
-                "inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold",
-                severityCfg.className
-              )}
-            >
-              {severityCfg.label}
-            </span>
-            <span className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))]">
+          {/* Middle: meta row */}
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[hsl(var(--muted-foreground))]">
+            <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
               {publishedDate || createdDate}
               <span className="opacity-60">({timeAgo})</span>
             </span>
-            {release.forceUpdate && (
-              <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
-                <AlertTriangle className="h-3 w-3" />
-                Force Update
+            <span className="flex items-center gap-1">
+              <Download className="h-3 w-3" />
+              <span className="font-semibold text-[hsl(var(--foreground))]">
+                {release._count.downloads.toLocaleString()}
               </span>
-            )}
+              downloads
+            </span>
             {release.minVersion && (
-              <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+              <span className="text-[10px]">
                 min: v{release.minVersion}
               </span>
             )}
-          </div>
-
-          {/* Row 3: Platforms, downloads, actions */}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              {release.assets.length > 0 ? (
-                release.assets.map((asset) => (
+            {release.assets.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {release.assets.map((asset) => (
                   <span
                     key={asset.id}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] px-2 py-1 text-[11px] font-medium text-[hsl(var(--foreground))]"
+                    className="inline-flex items-center gap-1 rounded border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] px-1.5 py-0.5 text-[10px] font-medium text-[hsl(var(--foreground))]"
                   >
                     <Monitor
                       className={cn(
-                        "h-3 w-3",
+                        "h-2.5 w-2.5",
                         platformIconColor[asset.platform] || "text-zinc-400"
                       )}
                     />
                     {platformLabel(asset.platform)} {archLabel(asset.arch)}
                   </span>
-                ))
-              ) : (
-                <span className="text-xs italic text-[hsl(var(--muted-foreground))]">
-                  No assets
-                </span>
-              )}
-              <span className="flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))]">
-                <Download className="h-3 w-3" />
-                {release._count.downloads.toLocaleString()} downloads
-              </span>
-            </div>
+                ))}
+              </div>
+            )}
+          </div>
 
+          {/* Actions row */}
+          <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2 border-t border-[hsl(var(--border)/0.5)] pt-3.5">
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -681,13 +688,15 @@ function ReleaseCard({
                 onClick={() => setExpanded(!expanded)}
               >
                 <Eye className="h-3.5 w-3.5" />
-                {expanded ? "Collapse" : "View Details"}
+                {expanded ? "Collapse" : "Details"}
                 {expanded ? (
                   <ChevronUp className="h-3 w-3" />
                 ) : (
                   <ChevronDown className="h-3 w-3" />
                 )}
               </Button>
+            </div>
+            <div className="flex items-center gap-2">
               <RoleGuard permission="releases.publish">
                 {status === "draft" && (
                   <Button size="sm" onClick={() => onPublish(release.id)}>
@@ -705,7 +714,7 @@ function ReleaseCard({
                     onClick={() => onBlock(release.id)}
                   >
                     <ShieldBan className="h-3.5 w-3.5" />
-                    Block Version
+                    Block
                   </Button>
                 )}
               </RoleGuard>
@@ -1125,10 +1134,10 @@ export function ReleasesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))]">
+          <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--foreground))]">
             Releases
           </h1>
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">
+          <p className="mt-0.5 text-sm text-[hsl(var(--muted-foreground))]">
             Manage software releases and distribution channels.
           </p>
         </div>
@@ -1162,67 +1171,64 @@ export function ReleasesPage() {
         />
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
-              <Input
-                placeholder="Search by version, title, or notes..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Select value={channelFilter} onValueChange={setChannelFilter}>
-              <SelectTrigger className="w-36">
-                <SelectValue placeholder="Channel" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Channels</SelectItem>
-                <SelectItem value="stable">Stable</SelectItem>
-                <SelectItem value="beta">Beta</SelectItem>
-                <SelectItem value="rc">RC</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-36">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="published">Published</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="blocked">Blocked</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Filters -- single compact row */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
+          <Input
+            placeholder="Search by version, title, or notes..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 h-9"
+          />
+        </div>
+        <Select value={channelFilter} onValueChange={setChannelFilter}>
+          <SelectTrigger className="w-36 h-9">
+            <SelectValue placeholder="Channel" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Channels</SelectItem>
+            <SelectItem value="stable">Stable</SelectItem>
+            <SelectItem value="beta">Beta</SelectItem>
+            <SelectItem value="rc">RC</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-36 h-9">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="published">Published</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="blocked">Blocked</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       {/* Release Cards */}
       {filteredReleases.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--card)/0.5)] py-20 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--muted))]">
-            <Package className="h-8 w-8 text-[hsl(var(--muted-foreground)/0.7)]" />
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--card)/0.5)] py-24 text-center">
+          <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-[hsl(var(--primary)/0.08)]">
+            <Package className="h-10 w-10 text-[hsl(var(--primary)/0.5)]" />
           </div>
-          <h3 className="mt-4 text-base font-semibold text-[hsl(var(--foreground))]">
-            No releases found
-          </h3>
-          <p className="mt-1.5 max-w-sm text-sm text-[hsl(var(--muted-foreground))]">
+          <h3 className="mt-5 text-lg font-semibold text-[hsl(var(--foreground))]">
             {searchQuery || channelFilter !== "all" || statusFilter !== "all"
-              ? "Try adjusting your search or filters."
-              : "Create your first release to start distributing software."}
+              ? "No matching releases"
+              : "No releases yet"}
+          </h3>
+          <p className="mt-2 max-w-md text-sm text-[hsl(var(--muted-foreground))] leading-relaxed">
+            {searchQuery || channelFilter !== "all" || statusFilter !== "all"
+              ? "Try adjusting your search query or filters to find what you're looking for."
+              : "Releases let you distribute software builds to your users. Create your first release to get started."}
           </p>
           {!(searchQuery || channelFilter !== "all" || statusFilter !== "all") && (
-            <p className="mt-3 flex items-center gap-1.5 text-xs text-[hsl(var(--muted-foreground)/0.6)]">
-              Use the
-              <span className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--primary)/0.1)] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--primary))]">
-                <Plus className="h-3 w-3" /> New Release
-              </span>
-              button above to get started
-            </p>
+            <RoleGuard permission="releases.create">
+              <Button className="mt-6" onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Create Your First Release
+              </Button>
+            </RoleGuard>
           )}
         </div>
       ) : (

@@ -13,8 +13,6 @@ import {
   ScrollText,
   Settings,
   ChevronLeft,
-  ChevronRight,
-  Shield,
   LogOut,
   User,
 } from "lucide-react";
@@ -31,7 +29,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
@@ -157,38 +154,51 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     <TooltipProvider delayDuration={0}>
       <aside
         className={cn(
-          "fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-[hsl(var(--border))] bg-[hsl(var(--card))] transition-all duration-300 ease-in-out",
+          "fixed left-0 top-0 z-40 h-screen border-r border-[hsl(var(--border))] bg-[hsl(var(--card))] flex flex-col transition-all duration-300 ease-in-out",
           collapsed ? "w-16" : "w-[260px]"
         )}
       >
         {/* Logo */}
-        <div className="flex h-14 items-center gap-3 border-b border-[hsl(var(--border))] px-4">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary))]">
-            <Shield className="h-4 w-4 text-white" />
+        <div className={cn(
+          "flex h-[60px] items-center border-b border-[hsl(var(--border))] shrink-0",
+          collapsed ? "justify-center px-2" : "gap-3 px-4"
+        )}>
+          <img
+            src="/logo.png"
+            alt="Cyber Chakra"
+            className="h-9 w-9 shrink-0 rounded-full object-contain"
+          />
+          <div className={cn(
+            "flex flex-col overflow-hidden transition-all duration-300",
+            collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+          )}>
+            <span className="text-sm font-bold tracking-tight text-[hsl(var(--foreground))] whitespace-nowrap">
+              Cyber Chakra
+            </span>
+            <span className="text-[10px] text-[hsl(var(--muted-foreground))] whitespace-nowrap">
+              Admin Portal
+            </span>
           </div>
-          {!collapsed && (
-            <div className="flex flex-col">
-              <span className="text-sm font-bold tracking-tight text-[hsl(var(--foreground))]">
-                CCF Admin
-              </span>
-              <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
-                Forensics Portal
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
           <div className="space-y-6">
             {filteredNavigation.map((section) => (
               <div key={section.title}>
-                {!collapsed && (
-                  <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-widest text-[hsl(var(--muted-foreground))]">
+                {/* Section header */}
+                <div className={cn(
+                  "mb-2 overflow-hidden transition-all duration-300",
+                  collapsed ? "h-0 opacity-0" : "h-auto opacity-100"
+                )}>
+                  <span className="px-2 text-[10px] font-semibold tracking-[0.15em] text-[hsl(var(--muted-foreground))]/60 uppercase">
                     {section.title}
-                  </div>
+                  </span>
+                </div>
+                {collapsed && (
+                  <div className="mx-auto mb-2 h-px w-6 bg-[hsl(var(--border))]" />
                 )}
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   {section.items.map((item) => {
                     const isActive =
                       location.pathname === item.href ||
@@ -200,11 +210,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                         key={item.href}
                         to={item.href}
                         className={cn(
-                          "group flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-150",
+                          "group relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-all duration-150",
                           isActive
-                            ? "bg-[hsl(var(--primary)/0.12)] text-[hsl(var(--primary))]"
-                            : "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))]",
-                          collapsed && "justify-center px-2"
+                            ? "bg-[hsl(var(--primary))]/8 text-[hsl(var(--primary))] border-l-2 border-[hsl(var(--primary))] font-medium"
+                            : "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]/50 hover:text-[hsl(var(--foreground))] border-l-2 border-transparent",
+                          collapsed && "justify-center px-2 border-l-0",
+                          collapsed && isActive && "bg-[hsl(var(--primary))]/8"
                         )}
                       >
                         <item.icon
@@ -215,22 +226,23 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                               : "text-[hsl(var(--muted-foreground))] group-hover:text-[hsl(var(--foreground))]"
                           )}
                         />
-                        {!collapsed && (
-                          <>
-                            <span className="flex-1">{item.label}</span>
-                            {item.badge !== undefined && (
-                              <span
-                                className={cn(
-                                  "flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold",
-                                  isActive
-                                    ? "bg-[hsl(var(--primary)/0.2)] text-[hsl(var(--primary))]"
-                                    : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
-                                )}
-                              >
-                                {item.badge}
-                              </span>
+                        <span className={cn(
+                          "flex-1 whitespace-nowrap transition-all duration-300",
+                          collapsed ? "w-0 overflow-hidden opacity-0" : "w-auto opacity-100"
+                        )}>
+                          {item.label}
+                        </span>
+                        {!collapsed && item.badge !== undefined && (
+                          <span
+                            className={cn(
+                              "flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold transition-all duration-300",
+                              isActive
+                                ? "bg-[hsl(var(--primary))]/20 text-[hsl(var(--primary))]"
+                                : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
                             )}
-                          </>
+                          >
+                            {item.badge}
+                          </span>
                         )}
                       </NavLink>
                     );
@@ -240,7 +252,14 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                         <Tooltip key={item.href}>
                           <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
                           <TooltipContent side="right">
-                            {item.label}
+                            <div className="flex items-center gap-2">
+                              {item.label}
+                              {item.badge !== undefined && (
+                                <span className="rounded-full bg-[hsl(var(--primary))]/20 px-1.5 py-0.5 text-[10px] font-semibold text-[hsl(var(--primary))]">
+                                  {item.badge}
+                                </span>
+                              )}
+                            </div>
                           </TooltipContent>
                         </Tooltip>
                       );
@@ -254,34 +273,32 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           </div>
         </nav>
 
-        {/* Collapse toggle */}
-        <Separator />
-
         {/* User section */}
-        <div className="p-3">
+        <div className="border-t border-[hsl(var(--border))] p-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-[hsl(var(--accent))] cursor-pointer",
+                  "flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-[hsl(var(--muted))]/50 cursor-pointer",
                   collapsed && "justify-center"
                 )}
               >
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-[hsl(var(--primary)/0.15)] text-[hsl(var(--primary))] text-xs font-semibold">
+                <Avatar className="h-8 w-8 shrink-0">
+                  <AvatarFallback className="bg-[hsl(var(--primary))]/15 text-[hsl(var(--primary))] text-xs font-semibold">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
-                {!collapsed && (
-                  <div className="flex flex-col items-start text-left">
-                    <span className="text-sm font-medium text-[hsl(var(--foreground))]">
-                      {user?.name || "Admin"}
-                    </span>
-                    <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
-                      {user?.role || "Super Admin"}
-                    </span>
-                  </div>
-                )}
+                <div className={cn(
+                  "flex flex-col items-start text-left overflow-hidden transition-all duration-300",
+                  collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+                )}>
+                  <span className="text-sm font-medium text-[hsl(var(--foreground))] whitespace-nowrap">
+                    {user?.name || "Admin"}
+                  </span>
+                  <span className="text-[10px] text-[hsl(var(--muted-foreground))] whitespace-nowrap">
+                    {user?.role || "Super Admin"}
+                  </span>
+                </div>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="start" className="w-56">
@@ -312,18 +329,20 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          <button
-            onClick={onToggle}
-            className="mt-2 flex w-full items-center justify-center rounded-lg py-1.5 text-[hsl(var(--muted-foreground))] transition-colors hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--foreground))] cursor-pointer"
-          >
-            {collapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronLeft className="h-4 w-4" />
-            )}
-          </button>
         </div>
+
+        {/* Collapse toggle at bottom */}
+        <button
+          onClick={onToggle}
+          className="flex items-center justify-center h-10 w-full border-t border-[hsl(var(--border))] hover:bg-[hsl(var(--muted))]/50 transition-colors cursor-pointer shrink-0"
+        >
+          <ChevronLeft
+            className={cn(
+              "h-4 w-4 text-[hsl(var(--muted-foreground))] transition-transform duration-300",
+              collapsed && "rotate-180"
+            )}
+          />
+        </button>
       </aside>
     </TooltipProvider>
   );

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { ProtectedRoute } from "./ProtectedRoute";
@@ -10,6 +10,25 @@ export function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const location = useLocation();
+  const [pageKey, setPageKey] = useState(location.pathname);
+
+  // Trigger fade-in on route change
+  useEffect(() => {
+    setPageKey(location.pathname);
+  }, [location.pathname]);
+
+  // Auto-collapse sidebar on screens narrower than 1280px
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 1279px)");
+    const handleChange = (e: MediaQueryListEvent | MediaQueryList) => {
+      setSidebarCollapsed(e.matches);
+    };
+    // Set initial state
+    handleChange(mql);
+    mql.addEventListener("change", handleChange);
+    return () => mql.removeEventListener("change", handleChange);
+  }, []);
 
   // Global keyboard shortcut: Cmd+K (Mac) / Ctrl+K (Windows)
   const handleGlobalKeyDown = useCallback((e: KeyboardEvent) => {
@@ -30,7 +49,7 @@ export function DashboardLayout() {
         {/* Mobile overlay */}
         {mobileMenuOpen && (
           <div
-            className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+            className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden"
             onClick={() => setMobileMenuOpen(false)}
           />
         )}
@@ -60,8 +79,8 @@ export function DashboardLayout() {
             onSearchClick={() => setCommandPaletteOpen(true)}
           />
 
-          <main className="flex-1 overflow-y-auto">
-            <div className="mx-auto max-w-[1400px] p-6">
+          <main className="flex-1 overflow-y-auto bg-[radial-gradient(ellipse_at_top,hsl(var(--muted)/0.3)_0%,transparent_70%)]">
+            <div key={pageKey} className="mx-auto max-w-[1400px] px-6 py-5 page-fade-in">
               <Outlet />
             </div>
           </main>

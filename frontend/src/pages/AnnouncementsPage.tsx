@@ -354,8 +354,8 @@ function AnnouncementCard({
           </div>
         </div>
 
-        {/* Row 2: message */}
-        <p className="mt-3 text-sm leading-relaxed text-[hsl(var(--muted-foreground))]">
+        {/* Row 2: message preview */}
+        <p className="mt-3 text-sm leading-relaxed text-[hsl(var(--muted-foreground))] line-clamp-3">
           {announcement.message}
         </p>
 
@@ -395,33 +395,53 @@ function AnnouncementCard({
         </div>
 
         {/* Row 5: actions */}
-        <div className="mt-4 flex items-center gap-2 border-t border-[hsl(var(--border))] pt-3">
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            <Pencil className="h-3.5 w-3.5" />
-            Edit
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
+        <div className="mt-4 flex items-center justify-between border-t border-[hsl(var(--border))] pt-3">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              <Pencil className="h-3.5 w-3.5" />
+              Edit
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggleActive}
+              className={
+                announcement.isActive
+                  ? "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))]"
+                  : "text-[hsl(var(--muted-foreground))] hover:text-emerald-400"
+              }
+            >
+              {announcement.isActive ? (
+                <>
+                  <PowerOff className="h-3.5 w-3.5" />
+                  Deactivate
+                </>
+              ) : (
+                <>
+                  <Power className="h-3.5 w-3.5" />
+                  Activate
+                </>
+              )}
+            </Button>
+          </div>
+          {/* Active/Inactive toggle indicator */}
+          <button
             onClick={onToggleActive}
-            className={
+            className={cn(
+              "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
               announcement.isActive
-                ? "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))]"
-                : "text-[hsl(var(--muted-foreground))] hover:text-emerald-400"
-            }
-          >
-            {announcement.isActive ? (
-              <>
-                <PowerOff className="h-3.5 w-3.5" />
-                Deactivate
-              </>
-            ) : (
-              <>
-                <Power className="h-3.5 w-3.5" />
-                Activate
-              </>
+                ? "bg-emerald-500"
+                : "bg-[hsl(var(--muted))]",
             )}
-          </Button>
+            title={announcement.isActive ? "Active - click to deactivate" : "Inactive - click to activate"}
+          >
+            <span
+              className={cn(
+                "pointer-events-none block h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+                announcement.isActive ? "translate-x-4" : "translate-x-0",
+              )}
+            />
+          </button>
         </div>
       </CardContent>
     </Card>
@@ -668,9 +688,8 @@ export function AnnouncementsPage() {
             value: counts.total,
             color: "text-[hsl(var(--foreground))]",
             icon: Megaphone,
-            iconColor: "text-blue-400",
-            iconBg: "bg-blue-500/10",
-            border: "border-l-blue-500",
+            iconColor: "text-[hsl(var(--primary))]",
+            iconBg: "bg-[hsl(var(--primary)/0.1)]",
           },
           {
             label: "Active",
@@ -679,7 +698,6 @@ export function AnnouncementsPage() {
             icon: CheckCircle,
             iconColor: "text-emerald-400",
             iconBg: "bg-emerald-500/10",
-            border: "border-l-emerald-500",
           },
           {
             label: "Inactive",
@@ -688,7 +706,6 @@ export function AnnouncementsPage() {
             icon: PauseCircle,
             iconColor: "text-slate-400",
             iconBg: "bg-slate-500/10",
-            border: "border-l-slate-500",
           },
           {
             label: "Expired",
@@ -697,29 +714,30 @@ export function AnnouncementsPage() {
             icon: XCircle,
             iconColor: "text-red-400",
             iconBg: "bg-red-500/10",
-            border: "border-l-red-500",
           },
         ].map((s) => {
           const Icon = s.icon;
           return (
-            <Card key={s.label} className={cn("border-l-4", s.border)}>
-              <CardContent className="p-4">
+            <Card key={s.label}>
+              <CardContent className="px-4 py-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
-                    {s.label}
-                  </p>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+                      {s.label}
+                    </p>
+                    <p className={cn("mt-0.5 text-xl font-bold", s.color)}>
+                      {s.value}
+                    </p>
+                  </div>
                   <div
                     className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded-lg",
+                      "flex h-9 w-9 items-center justify-center rounded-lg",
                       s.iconBg,
                     )}
                   >
                     <Icon className={cn("h-4 w-4", s.iconColor)} />
                   </div>
                 </div>
-                <p className={cn("mt-1 text-2xl font-bold", s.color)}>
-                  {s.value}
-                </p>
               </CardContent>
             </Card>
           );
@@ -774,26 +792,33 @@ export function AnnouncementsPage() {
 
       {/* Announcement cards */}
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--card)/0.5)] py-20 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--muted))]">
-            <Megaphone className="h-8 w-8 text-[hsl(var(--muted-foreground)/0.7)]" />
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--card)/0.5)] py-20 px-6 text-center">
+          <div className="relative mb-2">
+            <div className="absolute -inset-3 rounded-full bg-[hsl(var(--primary)/0.06)]" />
+            <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--muted))]">
+              <Megaphone className="h-8 w-8 text-[hsl(var(--muted-foreground)/0.6)]" />
+            </div>
           </div>
-          <h3 className="mt-4 text-base font-semibold text-[hsl(var(--foreground))]">
-            No announcements found
-          </h3>
-          <p className="mt-1.5 max-w-sm text-sm text-[hsl(var(--muted-foreground))]">
+          <h3 className="mt-4 text-lg font-semibold text-[hsl(var(--foreground))]">
             {search || typeFilter !== "all" || statusFilter !== "all"
-              ? "Try adjusting your search or filters."
-              : "Create an announcement to broadcast to desktop app users."}
+              ? "No announcements found"
+              : "No announcements yet"}
+          </h3>
+          <p className="mt-2 max-w-md text-sm leading-relaxed text-[hsl(var(--muted-foreground))]">
+            {search || typeFilter !== "all" || statusFilter !== "all"
+              ? "Try adjusting your search or filters to find what you're looking for."
+              : "Broadcast important updates, maintenance windows, and alerts to CMF desktop app users."}
           </p>
           {!(search || typeFilter !== "all" || statusFilter !== "all") && (
-            <p className="mt-3 flex items-center gap-1.5 text-xs text-[hsl(var(--muted-foreground)/0.6)]">
-              Use the
-              <span className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--primary)/0.1)] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--primary))]">
-                <Plus className="h-3 w-3" /> New Announcement
-              </span>
-              button above to get started
-            </p>
+            <RoleGuard permission="announcements.create">
+              <Button
+                className="mt-5 gap-2 bg-[hsl(var(--primary))] text-white hover:bg-[hsl(var(--primary)/0.9)]"
+                onClick={openCreate}
+              >
+                <Plus className="h-4 w-4" />
+                Create Your First Announcement
+              </Button>
+            </RoleGuard>
           )}
         </div>
       ) : (

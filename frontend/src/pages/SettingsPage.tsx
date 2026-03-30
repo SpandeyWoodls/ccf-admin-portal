@@ -115,36 +115,42 @@ function ProfileTab() {
 
   return (
     <div className="space-y-6">
+      {/* Personal Information Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <User className="h-4 w-4 text-[hsl(var(--primary))]" />
-            Admin Profile
+            Personal Information
           </CardTitle>
           <CardDescription>
-            Manage your personal information and password.
+            Manage your name and contact details.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           {/* Name */}
-          <div className="space-y-2">
-            <Label htmlFor="profile-name">Full Name</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="profile-name" className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
+              Full Name
+            </Label>
             <Input
               id="profile-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Your name"
+              className="h-10"
             />
           </div>
 
           {/* Email */}
-          <div className="space-y-2">
-            <Label htmlFor="profile-email">Email Address</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="profile-email" className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
+              Email Address
+            </Label>
             <Input
               id="profile-email"
               value={email}
               readOnly
-              className="opacity-60 cursor-not-allowed"
+              className="h-10 opacity-60 cursor-not-allowed"
             />
             <p className="text-xs text-[hsl(var(--muted-foreground))]">
               To change your email, contact the system administrator or use the
@@ -152,86 +158,12 @@ function ProfileTab() {
             </p>
           </div>
 
-          <Separator />
-
-          {/* Password section */}
-          <div>
-            <h4 className="mb-3 text-sm font-medium text-[hsl(var(--foreground))]">
-              Change Password
-            </h4>
-            <div className="space-y-4">
-              {/* Current password */}
-              <div className="space-y-2">
-                <Label htmlFor="current-password">Current Password</Label>
-                <div className="relative">
-                  <Input
-                    id="current-password"
-                    type={showCurrent ? "text" : "password"}
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Enter current password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowCurrent(!showCurrent)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] cursor-pointer"
-                  >
-                    {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* New password */}
-              <div className="space-y-2">
-                <Label htmlFor="new-password">New Password</Label>
-                <div className="relative">
-                  <Input
-                    id="new-password"
-                    type={showNew ? "text" : "password"}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNew(!showNew)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] cursor-pointer"
-                  >
-                    {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Confirm password */}
-              <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirm New Password</Label>
-                <div className="relative">
-                  <Input
-                    id="confirm-password"
-                    type={showConfirm ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm new password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirm(!showConfirm)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] cursor-pointer"
-                  >
-                    {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                {newPassword && confirmPassword && newPassword !== confirmPassword && (
-                  <p className="text-xs text-[hsl(var(--destructive))]">
-                    Passwords do not match.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
           <div className="flex justify-end pt-2">
-            <Button onClick={handleUpdateProfile} disabled={saving}>
+            <Button
+              onClick={handleUpdateProfile}
+              disabled={saving}
+              className="bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(230_65%_55%)] text-white shadow-md hover:shadow-lg hover:brightness-110 transition-all duration-200"
+            >
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -239,6 +171,123 @@ function ProfileTab() {
                 </>
               ) : (
                 "Update Profile"
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Password Card - separate with warning border */}
+      <Card className="border-[hsl(var(--warning)/0.3)] bg-[hsl(var(--warning)/0.02)]">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--warning)/0.1)]">
+              <Lock className="h-4 w-4 text-[hsl(var(--warning))]" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Change Password</CardTitle>
+              <CardDescription>
+                Update your password to keep your account secure.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Current password */}
+          <div className="space-y-1.5">
+            <Label htmlFor="current-password" className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
+              Current Password
+            </Label>
+            <div className="relative">
+              <Input
+                id="current-password"
+                type={showCurrent ? "text" : "password"}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Enter current password"
+                className="h-10 pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrent(!showCurrent)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] cursor-pointer transition-colors"
+              >
+                {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
+          {/* New password */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="new-password" className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                New Password
+              </Label>
+              <div className="relative">
+                <Input
+                  id="new-password"
+                  type={showNew ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password"
+                  className="h-10 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNew(!showNew)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] cursor-pointer transition-colors"
+                >
+                  {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Confirm password */}
+            <div className="space-y-1.5">
+              <Label htmlFor="confirm-password" className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                Confirm New Password
+              </Label>
+              <div className="relative">
+                <Input
+                  id="confirm-password"
+                  type={showConfirm ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                  className="h-10 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm(!showConfirm)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] cursor-pointer transition-colors"
+                >
+                  {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {newPassword && confirmPassword && newPassword !== confirmPassword && (
+                <p className="text-xs text-[hsl(var(--destructive))]">
+                  Passwords do not match.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button
+              onClick={handleUpdateProfile}
+              disabled={saving}
+              className="bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(230_65%_55%)] text-white shadow-md hover:shadow-lg hover:brightness-110 transition-all duration-200"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Lock className="h-4 w-4" />
+                  Update Password
+                </>
               )}
             </Button>
           </div>
@@ -535,20 +584,20 @@ function GeneralTab() {
         <CardContent className="space-y-4">
           {/* Server URL */}
           <div className="space-y-2">
-            <Label>Server URL</Label>
-            <Input
-              value={API_BASE || window.location.origin}
-              readOnly
-              className="opacity-60 cursor-not-allowed font-mono text-xs"
-            />
+            <Label className="text-xs font-medium text-[hsl(var(--muted-foreground))]">Server URL</Label>
+            <div className="flex items-center rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] px-4 py-2.5">
+              <code className="font-mono text-sm text-[hsl(var(--foreground)/0.85)] select-all">
+                {API_BASE || window.location.origin}
+              </code>
+            </div>
           </div>
 
           {/* Health + Test */}
-          <div className="flex items-center justify-between pt-1">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.15)] px-4 py-3">
+            <div className="flex items-center gap-3">
               {serverHealthy === null ? (
                 <>
-                  <span className="inline-block h-2.5 w-2.5 rounded-full bg-[hsl(var(--muted-foreground))]" />
+                  <span className="inline-block h-3 w-3 rounded-full bg-[hsl(var(--muted-foreground)/0.4)]" />
                   <span className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
                     Not checked yet
                   </span>
@@ -556,20 +605,22 @@ function GeneralTab() {
               ) : (
                 <>
                   <span
-                    className={`inline-block h-2.5 w-2.5 rounded-full ${
+                    className={`inline-block h-3 w-3 rounded-full ${
                       serverHealthy
-                        ? "bg-[hsl(var(--success))] shadow-[0_0_6px_hsl(var(--success)/0.6)]"
-                        : "bg-[hsl(var(--destructive))] shadow-[0_0_6px_hsl(var(--destructive)/0.6)]"
+                        ? "bg-[hsl(var(--success))] animate-pulse-dot"
+                        : "bg-[hsl(var(--destructive))] animate-pulse-dot-red"
                     }`}
                   />
-                  <span className="text-sm font-medium">
-                    {serverHealthy ? "Connected" : "Unreachable"}
-                  </span>
-                  {healthLatency !== null && (
-                    <span className="text-xs text-[hsl(var(--muted-foreground))]">
-                      ({healthLatency}ms)
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">
+                      {serverHealthy ? "Connected" : "Unreachable"}
                     </span>
-                  )}
+                    {healthLatency !== null && (
+                      <span className="text-[11px] text-[hsl(var(--muted-foreground))]">
+                        Latency: {healthLatency}ms
+                      </span>
+                    )}
+                  </div>
                 </>
               )}
             </div>
@@ -825,43 +876,45 @@ export function SettingsPage() {
       {/* Tabs - vertical layout on larger screens */}
       <Tabs defaultValue="profile" orientation="vertical" className="flex flex-col gap-6 lg:flex-row">
         {/* Tab list - sidebar */}
-        <TabsList className="flex h-auto w-full flex-row justify-start gap-1 rounded-[var(--radius)] bg-[hsl(var(--muted)/0.5)] p-1.5 lg:w-56 lg:shrink-0 lg:flex-col lg:items-stretch">
+        <TabsList className="flex h-auto w-full flex-row justify-start gap-0.5 rounded-[var(--radius)] border border-[hsl(var(--border)/0.5)] bg-[hsl(var(--muted)/0.3)] p-1.5 lg:w-56 lg:shrink-0 lg:flex-col lg:items-stretch">
           <TabsTrigger
             value="profile"
-            className="justify-start gap-2 px-3 py-2.5 text-left data-[state=active]:bg-[hsl(var(--card))] data-[state=active]:shadow-sm"
+            className="justify-start gap-2.5 rounded-md px-3 py-2.5 text-left transition-all duration-200 data-[state=active]:bg-[hsl(var(--card))] data-[state=active]:shadow-sm data-[state=active]:text-[hsl(var(--primary))] data-[state=inactive]:hover:bg-[hsl(var(--muted)/0.5)]"
           >
-            <User className="h-4 w-4" />
+            <User className="h-4 w-4 shrink-0" />
             <span>Profile</span>
           </TabsTrigger>
           <TabsTrigger
             value="security"
-            className="justify-start gap-2 px-3 py-2.5 text-left data-[state=active]:bg-[hsl(var(--card))] data-[state=active]:shadow-sm"
+            className="justify-start gap-2.5 rounded-md px-3 py-2.5 text-left transition-all duration-200 data-[state=active]:bg-[hsl(var(--card))] data-[state=active]:shadow-sm data-[state=active]:text-[hsl(var(--primary))] data-[state=inactive]:hover:bg-[hsl(var(--muted)/0.5)]"
           >
-            <Shield className="h-4 w-4" />
+            <Shield className="h-4 w-4 shrink-0" />
             <span>Security</span>
           </TabsTrigger>
+          <div className="mx-2 my-1 hidden h-px bg-[hsl(var(--border)/0.5)] lg:block" />
           <TabsTrigger
             value="general"
-            className="justify-start gap-2 px-3 py-2.5 text-left data-[state=active]:bg-[hsl(var(--card))] data-[state=active]:shadow-sm"
+            className="justify-start gap-2.5 rounded-md px-3 py-2.5 text-left transition-all duration-200 data-[state=active]:bg-[hsl(var(--card))] data-[state=active]:shadow-sm data-[state=active]:text-[hsl(var(--primary))] data-[state=inactive]:hover:bg-[hsl(var(--muted)/0.5)]"
           >
-            <Settings className="h-4 w-4" />
+            <Settings className="h-4 w-4 shrink-0" />
             <span>General</span>
           </TabsTrigger>
           <RoleGuard permission="settings.team">
             <TabsTrigger
               value="team"
-              className="justify-start gap-2 px-3 py-2.5 text-left data-[state=active]:bg-[hsl(var(--card))] data-[state=active]:shadow-sm"
+              className="justify-start gap-2.5 rounded-md px-3 py-2.5 text-left transition-all duration-200 data-[state=active]:bg-[hsl(var(--card))] data-[state=active]:shadow-sm data-[state=active]:text-[hsl(var(--primary))] data-[state=inactive]:hover:bg-[hsl(var(--muted)/0.5)]"
             >
-              <Users className="h-4 w-4" />
+              <Users className="h-4 w-4 shrink-0" />
               <span>Team</span>
             </TabsTrigger>
           </RoleGuard>
+          <div className="mx-2 my-1 hidden h-px bg-[hsl(var(--border)/0.5)] lg:block" />
           <RoleGuard permission="settings.api">
             <TabsTrigger
               value="api"
-              className="justify-start gap-2 px-3 py-2.5 text-left data-[state=active]:bg-[hsl(var(--card))] data-[state=active]:shadow-sm"
+              className="justify-start gap-2.5 rounded-md px-3 py-2.5 text-left transition-all duration-200 data-[state=active]:bg-[hsl(var(--card))] data-[state=active]:shadow-sm data-[state=active]:text-[hsl(var(--primary))] data-[state=inactive]:hover:bg-[hsl(var(--muted)/0.5)]"
             >
-              <Key className="h-4 w-4" />
+              <Key className="h-4 w-4 shrink-0" />
               <span>API</span>
             </TabsTrigger>
           </RoleGuard>

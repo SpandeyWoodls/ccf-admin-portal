@@ -4,13 +4,10 @@ import {
   Send,
   Headphones,
   Lock,
-  AlertCircle,
   CheckCircle2,
   XCircle,
   MessageSquare,
   Loader2,
-  Clock,
-  CircleDot,
   Inbox,
   StickyNote,
   User,
@@ -18,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -223,14 +220,20 @@ function NoTicketsState() {
 function NoSelectionState() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center text-center px-8">
-      <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-xl bg-[hsl(var(--muted))]">
-        <MessageSquare className="h-7 w-7 text-[hsl(var(--muted-foreground)/0.5)]" />
+      {/* Layered bubble illustration */}
+      <div className="relative mb-6">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[hsl(var(--muted)/0.6)] shadow-sm">
+          <MessageSquare className="h-7 w-7 text-[hsl(var(--muted-foreground)/0.35)]" />
+        </div>
+        <div className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-lg bg-[hsl(var(--primary)/0.1)] ring-2 ring-[hsl(var(--card))]">
+          <MessageSquare className="h-3.5 w-3.5 text-[hsl(var(--primary)/0.5)]" />
+        </div>
       </div>
-      <h3 className="text-base font-semibold text-[hsl(var(--foreground))]">
-        Select a ticket from the list
-      </h3>
-      <p className="mt-1.5 max-w-xs text-sm text-[hsl(var(--muted-foreground))]">
-        Choose a ticket to view the conversation and respond.
+      <p className="text-sm font-medium text-[hsl(var(--muted-foreground)/0.7)]">
+        Select a ticket to view conversation
+      </p>
+      <p className="mt-1 text-xs text-[hsl(var(--muted-foreground)/0.45)]">
+        Choose from the list on the left to get started
       </p>
     </div>
   );
@@ -251,6 +254,13 @@ function NoFilterResultsState() {
   );
 }
 
+const priorityBorderColor: Record<string, string> = {
+  critical: "border-l-red-500",
+  high: "border-l-amber-500",
+  medium: "border-l-blue-500",
+  low: "border-l-gray-400",
+};
+
 /** Single ticket card in the list */
 function TicketListItem({
   ticket,
@@ -264,56 +274,67 @@ function TicketListItem({
   const cat = categoryConfig[ticket.category] ?? categoryConfig.other;
   const pri = priorityConfig[ticket.priority] ?? priorityConfig.medium;
   const sta = statusConfig[ticket.status] ?? statusConfig.open;
+  const borderColor = priorityBorderColor[ticket.priority] ?? "border-l-gray-400";
 
   return (
     <button
       type="button"
       onClick={onSelect}
       className={cn(
-        "group flex w-full flex-col gap-2 border-b border-[hsl(var(--border))] px-4 py-3 text-left transition-all duration-150",
-        "border-l-2",
+        "group flex w-full flex-col gap-1.5 px-4 py-3 text-left transition-all duration-150",
+        "border-l-[3px] border-b border-b-[hsl(var(--border)/0.5)]",
         isSelected
-          ? "border-l-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.06)]"
-          : "border-l-transparent hover:bg-[hsl(var(--muted)/0.5)]",
+          ? cn(borderColor, "bg-[hsl(var(--primary)/0.08)] shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.12)]")
+          : cn(borderColor.replace("border-l-", "border-l-").replace("500", "500/40").replace("400", "400/40"), "hover:bg-[hsl(var(--muted)/0.5)]"),
+        !isSelected && "opacity-80 hover:opacity-100",
       )}
+      style={!isSelected ? { borderLeftColor: `color-mix(in srgb, ${
+        ticket.priority === "critical" ? "#ef4444" :
+        ticket.priority === "high" ? "#f59e0b" :
+        ticket.priority === "medium" ? "#3b82f6" : "#9ca3af"
+      } 35%, transparent)` } : { borderLeftColor:
+        ticket.priority === "critical" ? "#ef4444" :
+        ticket.priority === "high" ? "#f59e0b" :
+        ticket.priority === "medium" ? "#3b82f6" : "#9ca3af"
+      }}
     >
       {/* Row 1: Ticket number + time */}
       <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-[11px] font-semibold text-[hsl(var(--foreground)/0.7)]">
+        <span className="font-mono text-[11px] font-semibold tracking-wide text-[hsl(var(--foreground)/0.6)]">
           {ticket.ticketNumber || ticket.id.slice(0, 8)}
         </span>
-        <span className="shrink-0 text-[10px] text-[hsl(var(--muted-foreground)/0.7)]">
+        <span className="shrink-0 text-[10px] text-[hsl(var(--muted-foreground)/0.6)]">
           {relativeTime(ticket.updatedAt)}
         </span>
       </div>
 
       {/* Row 2: Subject */}
-      <p className="truncate text-[13px] font-medium leading-snug text-[hsl(var(--foreground))]">
+      <p className={cn(
+        "truncate text-[13px] font-medium leading-snug",
+        isSelected ? "text-[hsl(var(--foreground))]" : "text-[hsl(var(--foreground)/0.85)]",
+      )}>
         {ticket.subject}
       </p>
 
-      {/* Row 3: Badges + org */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Badge
-          variant="secondary"
-          className="text-[10px] px-1.5 py-0 leading-tight font-medium bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] border-transparent"
-        >
+      {/* Row 3: Tiny pill badges + org */}
+      <div className="flex flex-wrap items-center gap-1">
+        <span className={cn("inline-flex items-center rounded-full px-1.5 py-[1px] text-[10px] font-medium leading-tight", cat.className)}>
           {cat.label}
-        </Badge>
-        <Badge
-          variant="secondary"
-          className="text-[10px] px-1.5 py-0 leading-tight font-medium bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] border-transparent"
-        >
+        </span>
+        <span className={cn("inline-flex items-center rounded-full px-1.5 py-[1px] text-[10px] font-medium leading-tight", pri.className)}>
           {pri.label}
-        </Badge>
-        <Badge
-          variant="secondary"
-          className="text-[10px] px-1.5 py-0 leading-tight font-medium bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] border-transparent"
-        >
+        </span>
+        <span className={cn(
+          "inline-flex items-center rounded-full px-1.5 py-[1px] text-[10px] font-medium leading-tight",
+          sta.variant === "success" ? "bg-emerald-500/12 text-emerald-600" :
+          sta.variant === "destructive" ? "bg-red-500/12 text-red-500" :
+          sta.variant === "warning" ? "bg-amber-500/12 text-amber-600" :
+          "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]",
+        )}>
           {sta.label}
-        </Badge>
+        </span>
         {ticket.organization?.name && (
-          <span className="ml-auto truncate max-w-[120px] text-[10px] text-[hsl(var(--muted-foreground)/0.7)]">
+          <span className="ml-auto truncate max-w-[110px] text-[10px] text-[hsl(var(--muted-foreground)/0.6)]">
             {ticket.organization.name}
           </span>
         )}
@@ -329,22 +350,27 @@ function MessageBubble({ msg }: { msg: TicketMessage }) {
 
   return (
     <div
-      className={cn("flex gap-3", isAdmin && !isNote ? "flex-row-reverse" : "flex-row")}
+      className={cn(
+        "flex gap-2.5",
+        isAdmin && !isNote ? "flex-row-reverse" : "flex-row",
+      )}
     >
       {/* Avatar */}
-      <Avatar className="h-8 w-8 shrink-0 mt-0.5">
+      <Avatar className="h-7 w-7 shrink-0 mt-1">
         <AvatarFallback
           className={cn(
-            "text-[10px] font-semibold",
+            "text-[9px] font-bold",
             isNote
-              ? "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
+              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
               : isAdmin
                 ? "bg-[hsl(var(--primary)/0.15)] text-[hsl(var(--primary))]"
                 : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]",
           )}
         >
-          {isAdmin ? (
-            <Headphones className="h-3.5 w-3.5" />
+          {isNote ? (
+            <StickyNote className="h-3 w-3" />
+          ) : isAdmin ? (
+            <Headphones className="h-3 w-3" />
           ) : (
             getInitials(msg.sender || "U")
           )}
@@ -354,12 +380,12 @@ function MessageBubble({ msg }: { msg: TicketMessage }) {
       {/* Bubble */}
       <div
         className={cn(
-          "max-w-[75%] rounded-lg px-3.5 py-2.5",
+          "max-w-[75%] px-3.5 py-2.5",
           isNote
-            ? "border border-dashed border-[hsl(var(--muted-foreground)/0.25)] bg-[hsl(var(--muted)/0.6)]"
+            ? "rounded-lg border border-dashed border-amber-400/40 bg-amber-50/80 dark:border-amber-500/25 dark:bg-amber-950/30"
             : isAdmin
-              ? "bg-[hsl(var(--primary)/0.08)] border border-[hsl(var(--primary)/0.12)]"
-              : "bg-[hsl(var(--muted)/0.7)] border border-[hsl(var(--border))]",
+              ? "rounded-lg rounded-tr-none bg-[hsl(var(--primary)/0.08)] border border-[hsl(var(--primary)/0.15)]"
+              : "rounded-lg rounded-tl-none bg-[hsl(var(--muted)/0.6)] border border-[hsl(var(--border)/0.8)]",
         )}
       >
         {/* Sender line */}
@@ -369,16 +395,15 @@ function MessageBubble({ msg }: { msg: TicketMessage }) {
             isAdmin && !isNote ? "flex-row-reverse" : "flex-row",
           )}
         >
-          <span className="text-xs font-semibold text-[hsl(var(--foreground))]">
+          <span className="text-[11px] font-bold text-[hsl(var(--foreground))]">
             {msg.sender}
           </span>
           {isNote && (
-            <span className="inline-flex items-center gap-1 rounded bg-[hsl(var(--muted-foreground)/0.12)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-              <StickyNote className="h-2.5 w-2.5" />
-              Internal Note
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-200/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-700 dark:bg-amber-800/40 dark:text-amber-400">
+              Note
             </span>
           )}
-          <span className="text-[10px] text-[hsl(var(--muted-foreground)/0.7)]">
+          <span className="text-[10px] text-[hsl(var(--muted-foreground)/0.55)]">
             {formatDateTime(msg.createdAt)}
           </span>
         </div>
@@ -386,10 +411,10 @@ function MessageBubble({ msg }: { msg: TicketMessage }) {
         {/* Body */}
         <p
           className={cn(
-            "text-sm leading-relaxed",
+            "text-sm leading-relaxed whitespace-pre-wrap",
             isNote
-              ? "text-[hsl(var(--muted-foreground))]"
-              : "text-[hsl(var(--foreground))]",
+              ? "text-amber-900/80 dark:text-amber-200/80"
+              : "text-[hsl(var(--foreground)/0.9)]",
           )}
         >
           {msg.body}
@@ -527,65 +552,31 @@ export function SupportPage() {
         </p>
       </div>
 
-      {/* Stats Cards -- derived from real data only */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card className="hover:shadow-sm">
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary)/0.1)]">
-              <CircleDot className="h-5 w-5 text-[hsl(var(--primary))]" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
-                Open
-              </p>
-              {showGlobalSkeleton ? (
-                <Skeleton className="mt-1 h-7 w-10" />
-              ) : (
-                <p className="text-2xl font-bold text-[hsl(var(--foreground))]">
-                  {openCount}
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-sm">
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--warning)/0.1)]">
-              <Clock className="h-5 w-5 text-[hsl(var(--warning))]" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
-                In Progress
-              </p>
-              {showGlobalSkeleton ? (
-                <Skeleton className="mt-1 h-7 w-10" />
-              ) : (
-                <p className="text-2xl font-bold text-[hsl(var(--foreground))]">
-                  {inProgressCount}
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-sm">
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--secondary)/0.5)]">
-              <AlertCircle className="h-5 w-5 text-[hsl(var(--muted-foreground))]" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
-                Awaiting Reply
-              </p>
-              {showGlobalSkeleton ? (
-                <Skeleton className="mt-1 h-7 w-10" />
-              ) : (
-                <p className="text-2xl font-bold text-[hsl(var(--foreground))]">
-                  {waitingCount}
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Stats Pills -- compact inline indicators */}
+      <div className="flex items-center gap-3">
+        {showGlobalSkeleton ? (
+          <Skeleton className="h-7 w-64 rounded-full" />
+        ) : (
+          <div className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-4 py-1.5 text-xs font-medium text-[hsl(var(--foreground))]">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-[hsl(var(--primary))]" />
+              <span className="text-[hsl(var(--muted-foreground))]">Open:</span>
+              <span className="font-semibold">{openCount}</span>
+            </span>
+            <span className="mx-2 text-[hsl(var(--border))]">|</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-[hsl(var(--warning))]" />
+              <span className="text-[hsl(var(--muted-foreground))]">In Progress:</span>
+              <span className="font-semibold">{inProgressCount}</span>
+            </span>
+            <span className="mx-2 text-[hsl(var(--border))]">|</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-[hsl(var(--muted-foreground))]" />
+              <span className="text-[hsl(var(--muted-foreground))]">Awaiting Reply:</span>
+              <span className="font-semibold">{waitingCount}</span>
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Status Tabs */}
@@ -615,7 +606,7 @@ export function SupportPage() {
       {hasNoTickets ? (
         <Card
           className="flex items-center justify-center"
-          style={{ height: "calc(100vh - 380px)", minHeight: "400px" }}
+          style={{ height: "calc(100vh - 300px)", minHeight: "450px" }}
         >
           <NoTicketsState />
         </Card>
@@ -623,7 +614,7 @@ export function SupportPage() {
         /* Split View */
         <div
           className="flex gap-4"
-          style={{ height: "calc(100vh - 380px)", minHeight: "500px" }}
+          style={{ height: "calc(100vh - 300px)", minHeight: "500px" }}
         >
           {/* ==================== LEFT PANEL: Ticket List ==================== */}
           <Card className="flex w-[38%] shrink-0 flex-col overflow-hidden">
@@ -667,57 +658,35 @@ export function SupportPage() {
               <NoSelectionState />
             ) : (
               <>
-                {/* Ticket header */}
-                <div className="border-b border-[hsl(var(--border))] p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      {/* Badges row */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-[11px] font-semibold text-[hsl(var(--foreground)/0.7)]">
-                          {selectedTicket.ticketNumber || selectedTicket.id.slice(0, 8)}
-                        </span>
-                        <Badge
-                          variant={
-                            (statusConfig[selectedTicket.status] ?? statusConfig.open)
-                              .variant
-                          }
-                          className="text-[10px]"
-                        >
-                          {(statusConfig[selectedTicket.status] ?? statusConfig.open)
-                            .label}
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-[10px]",
-                            (
-                              priorityConfig[selectedTicket.priority] ??
-                              priorityConfig.medium
-                            ).className,
-                          )}
-                        >
-                          {(
-                            priorityConfig[selectedTicket.priority] ??
-                            priorityConfig.medium
-                          ).label}
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-[10px]",
-                            (categoryConfig[selectedTicket.category] ?? categoryConfig.other)
-                              .className,
-                          )}
-                        >
-                          {(categoryConfig[selectedTicket.category] ?? categoryConfig.other)
-                            .label}
-                        </Badge>
-                      </div>
-
-                      {/* Subject */}
-                      <h2 className="mt-2 text-base font-semibold leading-snug text-[hsl(var(--foreground))]">
-                        {selectedTicket.subject}
-                      </h2>
+                {/* Ticket header -- compact layout */}
+                <div className="border-b border-[hsl(var(--border))] px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
+                      <span className="font-mono text-[11px] font-semibold tracking-wide text-[hsl(var(--foreground)/0.55)]">
+                        {selectedTicket.ticketNumber || selectedTicket.id.slice(0, 8)}
+                      </span>
+                      <Badge
+                        variant={
+                          (statusConfig[selectedTicket.status] ?? statusConfig.open)
+                            .variant
+                        }
+                        className="text-[10px] px-1.5 py-0"
+                      >
+                        {(statusConfig[selectedTicket.status] ?? statusConfig.open)
+                          .label}
+                      </Badge>
+                      <span className={cn(
+                        "inline-flex items-center rounded-full px-1.5 py-[1px] text-[10px] font-medium",
+                        (priorityConfig[selectedTicket.priority] ?? priorityConfig.medium).className,
+                      )}>
+                        {(priorityConfig[selectedTicket.priority] ?? priorityConfig.medium).label}
+                      </span>
+                      <span className={cn(
+                        "inline-flex items-center rounded-full px-1.5 py-[1px] text-[10px] font-medium",
+                        (categoryConfig[selectedTicket.category] ?? categoryConfig.other).className,
+                      )}>
+                        {(categoryConfig[selectedTicket.category] ?? categoryConfig.other).label}
+                      </span>
                     </div>
 
                     {/* Close button for non-closed/resolved tickets */}
@@ -727,32 +696,37 @@ export function SupportPage() {
                           variant="outline"
                           size="sm"
                           onClick={handleCloseTicket}
-                          className="shrink-0 text-xs"
+                          className="shrink-0 text-[11px] h-7 px-2.5"
                         >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          <CheckCircle2 className="h-3 w-3" />
                           Close
                         </Button>
                       )}
                   </div>
 
-                  {/* Meta row */}
-                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[hsl(var(--muted-foreground)/0.7)]">
+                  {/* Subject */}
+                  <h2 className="mt-1.5 text-[15px] font-semibold leading-snug text-[hsl(var(--foreground))]">
+                    {selectedTicket.subject}
+                  </h2>
+
+                  {/* Meta row -- single compact line */}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[hsl(var(--muted-foreground)/0.6)]">
                     {selectedTicket.license?.licenseKey && (
-                      <span className="flex items-center gap-1.5">
-                        <Lock className="h-3 w-3" />
-                        <span className="font-mono text-[11px]">
+                      <span className="flex items-center gap-1">
+                        <Lock className="h-2.5 w-2.5" />
+                        <span className="font-mono text-[10px]">
                           {maskLicenseKey(selectedTicket.license.licenseKey)}
                         </span>
                       </span>
                     )}
                     {selectedTicket.organization?.name && (
-                      <span className="flex items-center gap-1.5">
-                        <User className="h-3 w-3" />
+                      <span className="flex items-center gap-1">
+                        <User className="h-2.5 w-2.5" />
                         {selectedTicket.organization.name}
                       </span>
                     )}
                     <span>
-                      Created {formatDateTime(selectedTicket.createdAt)}
+                      {formatDateTime(selectedTicket.createdAt)}
                     </span>
                   </div>
                 </div>
@@ -784,7 +758,7 @@ export function SupportPage() {
                       This ticket is closed.
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2.5">
                       <Textarea
                         placeholder={
                           isInternal
@@ -795,9 +769,10 @@ export function SupportPage() {
                         onChange={(e) => setReplyText(e.target.value)}
                         rows={3}
                         className={cn(
-                          "resize-none text-sm",
+                          "resize-none text-sm transition-shadow duration-200",
+                          "border-[hsl(var(--border))] focus:border-[hsl(var(--primary)/0.5)] focus:ring-2 focus:ring-[hsl(var(--primary)/0.12)] focus:shadow-[0_0_0_3px_hsl(var(--primary)/0.08)]",
                           isInternal &&
-                            "border-dashed border-[hsl(var(--muted-foreground)/0.3)] bg-[hsl(var(--muted)/0.4)]",
+                            "border-dashed border-amber-400/40 bg-amber-50/50 focus:border-amber-400/60 focus:ring-amber-400/15 focus:shadow-[0_0_0_3px_hsl(45_93%_47%/0.08)] dark:bg-amber-950/20 dark:border-amber-500/30",
                         )}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -806,28 +781,49 @@ export function SupportPage() {
                         }}
                       />
                       <div className="flex items-center justify-between">
-                        <label className="flex cursor-pointer items-center gap-2 select-none">
-                          <input
-                            type="checkbox"
-                            checked={isInternal}
-                            onChange={(e) => setIsInternal(e.target.checked)}
-                            className="h-3.5 w-3.5 rounded border-[hsl(var(--input))] accent-[hsl(var(--muted-foreground))]"
-                          />
+                        <div className="flex items-center gap-3">
+                          {/* Toggle switch for internal note */}
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={isInternal}
+                            onClick={() => setIsInternal(!isInternal)}
+                            className={cn(
+                              "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200",
+                              isInternal
+                                ? "bg-amber-500"
+                                : "bg-[hsl(var(--muted-foreground)/0.2)]",
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "pointer-events-none inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-200",
+                                isInternal ? "translate-x-[18px]" : "translate-x-[3px]",
+                              )}
+                            />
+                          </button>
                           <span
                             className={cn(
-                              "text-xs font-medium",
+                              "text-xs font-medium select-none",
                               isInternal
-                                ? "text-[hsl(var(--foreground))]"
-                                : "text-[hsl(var(--muted-foreground))]",
+                                ? "text-amber-700 dark:text-amber-400"
+                                : "text-[hsl(var(--muted-foreground)/0.7)]",
                             )}
                           >
                             Internal Note
                           </span>
-                        </label>
+                          <span className="hidden sm:inline text-[10px] text-[hsl(var(--muted-foreground)/0.4)]">
+                            Ctrl+Enter to send
+                          </span>
+                        </div>
                         <Button
                           size="sm"
                           onClick={handleSendReply}
                           disabled={!replyText.trim() || isSending}
+                          className={cn(
+                            "text-xs font-semibold shadow-sm",
+                            !isSending && replyText.trim() && "bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--primary)/0.85)] hover:from-[hsl(var(--primary)/0.9)] hover:to-[hsl(var(--primary)/0.75)]",
+                          )}
                         >
                           {isSending ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />

@@ -13,7 +13,6 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -42,17 +41,17 @@ import { useCan } from "@/lib/rbac";
 
 const typeConfig: Record<
   string,
-  { label: string; variant: "default" | "secondary" | "outline" }
+  { label: string; variant: "default" | "secondary" | "outline"; color: string; avatarBg: string; avatarFg: string }
 > = {
-  law_enforcement: { label: "Law Enforcement", variant: "default" },
-  government: { label: "Government", variant: "secondary" },
-  forensic_lab: { label: "Forensic Lab", variant: "outline" },
-  private_lab: { label: "Private Lab", variant: "outline" },
-  academic: { label: "Academic", variant: "outline" },
-  educational: { label: "Educational", variant: "outline" },
-  corporate: { label: "Corporate", variant: "secondary" },
-  private: { label: "Private", variant: "secondary" },
-  individual: { label: "Individual", variant: "outline" },
+  law_enforcement: { label: "Law Enforcement", variant: "default", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200 dark:border-blue-800", avatarBg: "bg-blue-100 dark:bg-blue-900/40", avatarFg: "text-blue-700 dark:text-blue-300" },
+  government: { label: "Government", variant: "secondary", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800", avatarBg: "bg-emerald-100 dark:bg-emerald-900/40", avatarFg: "text-emerald-700 dark:text-emerald-300" },
+  forensic_lab: { label: "Forensic Lab", variant: "outline", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-purple-200 dark:border-purple-800", avatarBg: "bg-purple-100 dark:bg-purple-900/40", avatarFg: "text-purple-700 dark:text-purple-300" },
+  private_lab: { label: "Private Lab", variant: "outline", color: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 border-violet-200 dark:border-violet-800", avatarBg: "bg-violet-100 dark:bg-violet-900/40", avatarFg: "text-violet-700 dark:text-violet-300" },
+  academic: { label: "Academic", variant: "outline", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border-amber-200 dark:border-amber-800", avatarBg: "bg-amber-100 dark:bg-amber-900/40", avatarFg: "text-amber-700 dark:text-amber-300" },
+  educational: { label: "Educational", variant: "outline", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 border-orange-200 dark:border-orange-800", avatarBg: "bg-orange-100 dark:bg-orange-900/40", avatarFg: "text-orange-700 dark:text-orange-300" },
+  corporate: { label: "Corporate", variant: "secondary", color: "bg-slate-100 text-slate-700 dark:bg-slate-900/40 dark:text-slate-300 border-slate-200 dark:border-slate-800", avatarBg: "bg-slate-100 dark:bg-slate-900/40", avatarFg: "text-slate-700 dark:text-slate-300" },
+  private: { label: "Private", variant: "secondary", color: "bg-zinc-100 text-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800", avatarBg: "bg-zinc-100 dark:bg-zinc-900/40", avatarFg: "text-zinc-700 dark:text-zinc-300" },
+  individual: { label: "Individual", variant: "outline", color: "bg-gray-100 text-gray-600 dark:bg-gray-900/40 dark:text-gray-400 border-gray-200 dark:border-gray-800", avatarBg: "bg-gray-100 dark:bg-gray-900/40", avatarFg: "text-gray-600 dark:text-gray-400" },
 };
 
 function getTypeInfo(type: string) {
@@ -60,6 +59,9 @@ function getTypeInfo(type: string) {
     typeConfig[type] || {
       label: type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
       variant: "outline" as const,
+      color: "bg-gray-100 text-gray-600 dark:bg-gray-900/40 dark:text-gray-400 border-gray-200 dark:border-gray-800",
+      avatarBg: "bg-[hsl(var(--primary)/0.1)]",
+      avatarFg: "text-[hsl(var(--primary))]",
     }
   );
 }
@@ -109,17 +111,27 @@ function TableSkeleton() {
 
 function EmptyState({ hasSearch }: { hasSearch: boolean }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--muted))]">
-        <Building2 className="h-7 w-7 text-[hsl(var(--muted-foreground))]" />
+    <div className="flex flex-col items-center justify-center py-20 text-center">
+      <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-[hsl(var(--muted))]">
+        <Building2 className="h-8 w-8 text-[hsl(var(--muted-foreground)/0.6)]" />
+        {!hasSearch && (
+          <div className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]">
+            <Plus className="h-3.5 w-3.5" />
+          </div>
+        )}
+        {hasSearch && (
+          <div className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-[hsl(var(--muted-foreground)/0.3)]">
+            <Search className="h-3 w-3 text-[hsl(var(--muted-foreground))]" />
+          </div>
+        )}
       </div>
-      <h3 className="mt-4 text-sm font-semibold text-[hsl(var(--foreground))]">
+      <h3 className="mt-5 text-sm font-semibold text-[hsl(var(--foreground))]">
         {hasSearch ? "No organizations found" : "No organizations yet"}
       </h3>
-      <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+      <p className="mt-1.5 max-w-xs text-sm text-[hsl(var(--muted-foreground))]">
         {hasSearch
-          ? "Try adjusting your search query."
-          : "Create your first organization to get started."}
+          ? "Try adjusting your search query or clearing the filter."
+          : "Create your first organization to start managing licenses and contacts."}
       </p>
     </div>
   );
@@ -185,11 +197,18 @@ export function OrganizationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))]">
-            Organizations
-          </h1>
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">
-            Manage client organizations and their accounts.
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--foreground))]">
+              Organizations
+            </h1>
+            {!isLoading && organizations.length > 0 && (
+              <span className="inline-flex items-center rounded-full bg-[hsl(var(--muted))] px-2.5 py-0.5 text-xs font-medium text-[hsl(var(--muted-foreground))]">
+                {organizations.length}
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-sm text-[hsl(var(--muted-foreground))]">
+            Manage client organizations, licenses, and contacts.
           </p>
         </div>
         <RoleGuard permission="organizations.create">
@@ -203,13 +222,13 @@ export function OrganizationsPage() {
       {/* Search */}
       <Card>
         <CardContent className="p-4">
-          <div className="relative">
+          <div className="relative max-w-xl">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
             <Input
               placeholder="Search organizations by name, type, city, or email..."
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
-              className="pl-9"
+              className="pl-9 transition-shadow focus:shadow-md focus:shadow-[hsl(var(--ring)/0.1)]"
             />
           </div>
         </CardContent>
@@ -264,13 +283,13 @@ export function OrganizationsPage() {
                   return (
                     <TableRow
                       key={org.id}
-                      className="cursor-pointer"
+                      className="group cursor-pointer odd:bg-[hsl(var(--muted)/0.3)] transition-colors hover:bg-[hsl(var(--muted)/0.6)]"
                       onClick={() => navigate(`/organizations/${org.id}`)}
                     >
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))] text-[10px] font-semibold">
+                            <AvatarFallback className={`${typeInfo.avatarBg} ${typeInfo.avatarFg} text-[10px] font-semibold`}>
                               {initials}
                             </AvatarFallback>
                           </Avatar>
@@ -286,9 +305,9 @@ export function OrganizationsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={typeInfo.variant} className="text-[10px]">
+                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${typeInfo.color}`}>
                           {typeInfo.label}
-                        </Badge>
+                        </span>
                       </TableCell>
                       <TableCell className="text-sm text-[hsl(var(--muted-foreground))]">
                         {licensesCount}
@@ -301,8 +320,8 @@ export function OrganizationsPage() {
                           <div
                             className={`h-2 w-2 rounded-full ${
                               org.isActive
-                                ? "bg-[hsl(var(--success))]"
-                                : "bg-[hsl(var(--muted-foreground))]"
+                                ? "bg-[hsl(var(--success))] animate-pulse-dot"
+                                : "bg-[hsl(var(--muted-foreground)/0.4)]"
                             }`}
                           />
                           <span className="text-xs capitalize text-[hsl(var(--muted-foreground))]">
@@ -323,13 +342,13 @@ export function OrganizationsPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8"
+                              className="h-8 w-8 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -355,7 +374,7 @@ export function OrganizationsPage() {
                                 onClick={(e) =>
                                   handleDelete(e, org.id, org.name)
                                 }
-                                className="text-[hsl(var(--destructive))]"
+                                className="text-[hsl(var(--destructive))] focus:text-[hsl(var(--destructive))]"
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Delete

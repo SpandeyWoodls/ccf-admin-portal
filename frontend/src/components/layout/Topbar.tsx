@@ -56,7 +56,7 @@ export function Topbar({ onMobileMenuToggle, onSearchClick }: TopbarProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/0.8)] px-6 backdrop-blur-md">
+    <header className="sticky top-0 z-30 flex h-[52px] items-center gap-4 border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/0.8)] px-6 shadow-sm backdrop-blur-md">
       {/* Mobile menu button */}
       <Button
         variant="ghost"
@@ -97,11 +97,11 @@ export function Topbar({ onMobileMenuToggle, onSearchClick }: TopbarProps) {
       <button
         type="button"
         onClick={onSearchClick}
-        className="relative hidden h-8 w-64 cursor-pointer items-center gap-2 rounded-[var(--radius)] border border-[hsl(var(--input))] bg-[hsl(var(--muted))] pl-9 pr-3 text-xs text-[hsl(var(--muted-foreground))] transition-colors hover:bg-[hsl(var(--accent))] md:inline-flex"
+        className="relative hidden h-8 w-64 cursor-pointer items-center gap-2 rounded-full border border-[hsl(var(--input)/0.6)] bg-[hsl(var(--muted)/0.5)] pl-9 pr-3 text-xs text-[hsl(var(--muted-foreground))] backdrop-blur-sm transition-all duration-200 hover:border-[hsl(var(--input))] hover:bg-[hsl(var(--accent)/0.7)] hover:shadow-sm md:inline-flex"
       >
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2" />
         <span className="flex-1 text-left">Search...</span>
-        <kbd className="pointer-events-none inline-flex h-5 items-center gap-0.5 rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-1.5 font-mono text-[10px] font-medium text-[hsl(var(--muted-foreground))]">
+        <kbd className="pointer-events-none inline-flex h-5 items-center gap-0.5 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background)/0.8)] px-1.5 font-mono text-[10px] font-medium text-[hsl(var(--muted-foreground))]">
           {navigator.platform?.toLowerCase().includes("mac") ? "\u2318" : "Ctrl+"}K
         </kbd>
       </button>
@@ -109,12 +109,9 @@ export function Topbar({ onMobileMenuToggle, onSearchClick }: TopbarProps) {
       <Separator orientation="vertical" className="hidden h-6 md:block" />
 
       {/* Theme toggle */}
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleTheme}>
-        {isDark ? (
-          <Sun className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
-        ) : (
-          <Moon className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
-        )}
+      <Button variant="ghost" size="icon" className="relative h-8 w-8" onClick={toggleTheme}>
+        <Sun className={`h-4 w-4 text-[hsl(var(--muted-foreground))] absolute transition-all duration-300 ${isDark ? "rotate-0 scale-100 opacity-100" : "rotate-90 scale-0 opacity-0"}`} />
+        <Moon className={`h-4 w-4 text-[hsl(var(--muted-foreground))] absolute transition-all duration-300 ${isDark ? "-rotate-90 scale-0 opacity-0" : "rotate-0 scale-100 opacity-100"}`} />
       </Button>
 
       {/* Notifications */}
@@ -123,6 +120,7 @@ export function Topbar({ onMobileMenuToggle, onSearchClick }: TopbarProps) {
         <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[hsl(var(--destructive))] text-[9px] font-bold text-white">
           3
         </span>
+        <span className="absolute -right-0.5 -top-0.5 h-4 w-4 animate-ping rounded-full bg-[hsl(var(--destructive)/0.6)]" />
       </Button>
     </header>
   );

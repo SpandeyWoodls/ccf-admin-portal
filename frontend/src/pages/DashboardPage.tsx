@@ -32,15 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { useAuthStore } from "@/stores/authStore";
+// Table imports removed -- activity section now uses a timeline layout
 import { useDashboardStore } from "@/stores/dashboardStore";
 import type { DashboardStats } from "@/stores/dashboardStore";
 import { cn } from "@/lib/utils";
@@ -160,18 +152,15 @@ function formatRelativeTime(iso: string): string {
 
 function KpiCardSkeleton() {
   return (
-    <Card className="relative overflow-hidden">
+    <Card className="relative overflow-hidden border" style={{ borderTopWidth: "2px" }}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Skeleton className="h-3 w-24" />
-            <Skeleton className="h-7 w-16" />
+            <Skeleton className="h-8 w-16" />
             <Skeleton className="h-5 w-20 rounded-full" />
           </div>
-          <Skeleton className="h-10 w-10 rounded-xl" />
-        </div>
-        <div className="absolute bottom-0 left-0 h-0.5 w-full">
-          <Skeleton className="h-full w-full rounded-none" />
+          <Skeleton className="h-11 w-11 rounded-full" />
         </div>
       </CardContent>
     </Card>
@@ -196,9 +185,6 @@ function ChartSkeleton() {
 // ---------------------------------------------------------------------------
 
 export function DashboardPage() {
-  const { user } = useAuthStore();
-  const displayName = user?.name || "Admin";
-
   const { stats, isLoading, fetchStats } = useDashboardStore();
 
   const handleRefresh = useCallback(() => {
@@ -293,13 +279,11 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))]">
-            Welcome back, {displayName}
-          </h1>
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">
-            Here's an overview of your forensics license management system.
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Overview of your forensics license management system
           </p>
         </div>
         <Button
@@ -309,35 +293,42 @@ export function DashboardPage() {
           disabled={isLoading}
           className="shrink-0"
         >
-          <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+          <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", isLoading && "animate-spin")} />
           Refresh
         </Button>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         {isLoading && !stats
           ? Array.from({ length: 6 }).map((_, i) => <KpiCardSkeleton key={i} />)
           : kpiData.map((kpi) => (
-              <Card key={kpi.label} className="relative overflow-hidden">
+              <Card
+                key={kpi.label}
+                className="relative overflow-hidden border"
+                style={{ borderTopWidth: "2px", borderTopColor: kpi.color }}
+              >
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                         {kpi.label}
                       </p>
-                      <p className="text-2xl font-bold text-[hsl(var(--foreground))]">
+                      <p className="text-3xl font-bold text-[hsl(var(--foreground))] leading-none">
                         {kpi.value}
                       </p>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 pt-1">
                         {kpi.isWarning ? (
-                          <Badge variant="warning" className="text-[10px]">
+                          <Badge
+                            variant="warning"
+                            className="text-[10px] rounded-full px-2.5 py-0.5"
+                          >
                             {kpi.trend}
                           </Badge>
                         ) : (
                           <Badge
                             variant="secondary"
-                            className="text-[10px]"
+                            className="text-[10px] rounded-full px-2.5 py-0.5"
                           >
                             {kpi.trend}
                           </Badge>
@@ -345,24 +336,19 @@ export function DashboardPage() {
                       </div>
                     </div>
                     <div
-                      className="flex h-10 w-10 items-center justify-center rounded-xl"
+                      className="flex h-11 w-11 items-center justify-center rounded-full"
                       style={{ backgroundColor: `${kpi.color}15` }}
                     >
                       <kpi.icon className="h-5 w-5" style={{ color: kpi.color }} />
                     </div>
                   </div>
-                  {/* Subtle bottom accent */}
-                  <div
-                    className="absolute bottom-0 left-0 h-0.5 w-full opacity-60"
-                    style={{ backgroundColor: kpi.color }}
-                  />
                 </CardContent>
               </Card>
             ))}
       </div>
 
       {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         {isLoading && !stats ? (
           <>
             <ChartSkeleton />
@@ -371,7 +357,7 @@ export function DashboardPage() {
         ) : (
           <>
             {/* License Distribution */}
-            <Card>
+            <Card className="rounded-xl border shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-semibold">
                   License Distribution
@@ -379,7 +365,14 @@ export function DashboardPage() {
               </CardHeader>
               <CardContent>
                 {distributionData.length === 0 ? (
-                  <div className="flex h-52 flex-col items-center justify-center gap-3">
+                  <div
+                    className="flex h-52 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-[hsl(var(--border))]"
+                    style={{
+                      backgroundImage:
+                        "radial-gradient(circle, hsl(var(--muted-foreground) / 0.07) 1px, transparent 1px)",
+                      backgroundSize: "16px 16px",
+                    }}
+                  >
                     {/* Faded donut ring illustration */}
                     <svg width="80" height="80" viewBox="0 0 80 80" className="opacity-20">
                       <circle
@@ -493,7 +486,7 @@ export function DashboardPage() {
             </Card>
 
             {/* Activations Over Time */}
-            <Card>
+            <Card className="rounded-xl border shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-semibold">
                   Activations Over Time
@@ -501,7 +494,14 @@ export function DashboardPage() {
               </CardHeader>
               <CardContent>
                 {activationsData.length === 0 ? (
-                  <div className="flex h-52 flex-col items-center justify-center gap-3">
+                  <div
+                    className="flex h-52 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-[hsl(var(--border))]"
+                    style={{
+                      backgroundImage:
+                        "radial-gradient(circle, hsl(var(--muted-foreground) / 0.07) 1px, transparent 1px)",
+                      backgroundSize: "16px 16px",
+                    }}
+                  >
                     {/* Faded line chart illustration */}
                     <svg width="120" height="60" viewBox="0 0 120 60" className="opacity-15">
                       <line x1="0" y1="55" x2="120" y2="55" stroke="hsl(var(--muted-foreground))" strokeWidth="1" />
@@ -585,7 +585,7 @@ export function DashboardPage() {
       </div>
 
       {/* Recent Activity */}
-      <Card>
+      <Card className="rounded-xl border shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-semibold">
@@ -599,7 +599,7 @@ export function DashboardPage() {
             </Link>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="px-5 pb-5 pt-0">
           {activityRows.length === 0 ? (
             <div className="flex h-32 flex-col items-center justify-center gap-2">
               <Clock className="h-5 w-5 text-[hsl(var(--muted-foreground))] opacity-40" />
@@ -608,35 +608,43 @@ export function DashboardPage() {
               </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12"></TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Detail</TableHead>
-                  <TableHead className="text-right">Time</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {activityRows.map((event) => (
-                  <TableRow key={event.id} className="cursor-pointer">
-                    <TableCell>
-                      <event.icon className={cn("h-4 w-4", event.iconColor)} />
-                    </TableCell>
-                    <TableCell className="font-medium">{event.action}</TableCell>
-                    <TableCell className="text-[hsl(var(--muted-foreground))]">
-                      {event.detail}
-                    </TableCell>
-                    <TableCell className="text-right text-xs text-[hsl(var(--muted-foreground))]">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <Clock className="h-3 w-3" />
-                        {event.time}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="space-y-0">
+              {activityRows.map((event, idx) => (
+                <div
+                  key={event.id}
+                  className="group relative flex items-start gap-3 rounded-md px-3 py-3 transition-colors hover:bg-[hsl(var(--muted)/0.5)]"
+                >
+                  {/* Timeline connector line */}
+                  {idx < activityRows.length - 1 && (
+                    <div className="absolute left-[21px] top-[28px] bottom-[-12px] w-px bg-[hsl(var(--border))]" />
+                  )}
+
+                  {/* Colored dot */}
+                  <div className="relative mt-1.5 flex h-3 w-3 shrink-0 items-center justify-center">
+                    <div
+                      className={cn(
+                        "h-2.5 w-2.5 rounded-full ring-2 ring-background",
+                        event.iconColor
+                          .replace("text-[", "bg-[")
+                      )}
+                    />
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex flex-1 items-start justify-between gap-2 min-w-0">
+                    <div className="min-w-0">
+                      <p className="text-sm text-[hsl(var(--foreground))]">
+                        {event.action}{" "}
+                        <span className="font-semibold">{event.detail}</span>
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs text-[hsl(var(--muted-foreground))] whitespace-nowrap">
+                      {event.time}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>

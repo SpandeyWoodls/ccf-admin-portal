@@ -705,29 +705,31 @@ function StatsCards({ stats }: { stats: DownloadStats }) {
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {/* Total downloads */}
       <Card className="border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-        <CardContent className="p-5">
+        <CardContent className="px-4 py-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground)/0.7)]">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
                 Downloads This Month
               </p>
-              <p className="mt-1 text-2xl font-bold text-[hsl(var(--foreground))]">
+              <p className="mt-0.5 text-xl font-bold text-[hsl(var(--foreground))]">
                 {stats.totalThisMonth.toLocaleString()}
               </p>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(var(--primary)/0.1)]">
-              <Download className="h-5 w-5 text-[hsl(var(--primary))]" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[hsl(var(--primary)/0.1)]">
+              <Download className="h-4 w-4 text-[hsl(var(--primary))]" />
             </div>
           </div>
-          <div className="mt-2 flex items-center gap-1 text-xs">
-            <TrendingUp className="h-3 w-3 text-emerald-400" />
-            <span className="font-medium text-emerald-400">
-              +{stats.trend}%
-            </span>
-            <span className="text-[hsl(var(--muted-foreground)/0.6)]">
-              vs last month
-            </span>
-          </div>
+          {stats.trend !== 0 && (
+            <div className="mt-1.5 flex items-center gap-1 text-xs">
+              <TrendingUp className="h-3 w-3 text-emerald-400" />
+              <span className="font-medium text-emerald-400">
+                +{stats.trend}%
+              </span>
+              <span className="text-[hsl(var(--muted-foreground)/0.6)]">
+                vs last month
+              </span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -735,32 +737,32 @@ function StatsCards({ stats }: { stats: DownloadStats }) {
       {stats.byPlatform.map((p) => {
         const meta = getPlatformMeta(p.platform);
         const Icon = meta.icon;
-        const pct = Math.round((p.count / stats.totalThisMonth) * 100);
+        const pct = stats.totalThisMonth > 0 ? Math.round((p.count / stats.totalThisMonth) * 100) : 0;
         return (
           <Card
             key={p.platform}
             className="border-[hsl(var(--border))] bg-[hsl(var(--card))]"
           >
-            <CardContent className="p-5">
+            <CardContent className="px-4 py-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground)/0.7)]">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
                     {meta.label}
                   </p>
-                  <p className="mt-1 text-2xl font-bold text-[hsl(var(--foreground))]">
+                  <p className="mt-0.5 text-xl font-bold text-[hsl(var(--foreground))]">
                     {p.count.toLocaleString()}
                   </p>
                 </div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(var(--muted)/0.5)]">
-                  <Icon className={cn("h-5 w-5", meta.color)} />
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[hsl(var(--muted)/0.5)]">
+                  <Icon className={cn("h-4 w-4", meta.color)} />
                 </div>
               </div>
               {/* Percentage bar */}
-              <div className="mt-3">
-                <div className="flex items-center justify-between text-xs text-[hsl(var(--muted-foreground))]">
+              <div className="mt-1.5">
+                <div className="flex items-center justify-between text-[10px] text-[hsl(var(--muted-foreground))]">
                   <span>{pct}% of total</span>
                 </div>
-                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[hsl(var(--muted)/0.5)]">
+                <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-[hsl(var(--muted)/0.5)]">
                   <div
                     className="h-full rounded-full bg-[hsl(var(--primary)/0.6)] transition-all duration-500"
                     style={{ width: `${pct}%` }}
@@ -774,21 +776,21 @@ function StatsCards({ stats }: { stats: DownloadStats }) {
 
       {/* Total releases */}
       <Card className="border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-        <CardContent className="p-5">
+        <CardContent className="px-4 py-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground)/0.7)]">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
                 Published Releases
               </p>
-              <p className="mt-1 text-2xl font-bold text-[hsl(var(--foreground))]">
+              <p className="mt-0.5 text-xl font-bold text-[hsl(var(--foreground))]">
                 {stats.byVersion.length}
               </p>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10">
-              <Package className="h-5 w-5 text-emerald-400" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10">
+              <Package className="h-4 w-4 text-emerald-400" />
             </div>
           </div>
-          <div className="mt-2 text-xs text-[hsl(var(--muted-foreground)/0.6)]">
+          <div className="mt-1.5 text-[10px] text-[hsl(var(--muted-foreground)/0.6)]">
             Across stable, beta, and RC channels
           </div>
         </CardContent>
@@ -964,9 +966,11 @@ export function DownloadsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(var(--primary)/0.1)]">
-              <ArrowDownToLine className="h-5 w-5 text-[hsl(var(--primary))]" />
-            </div>
+            <img
+              src="/logo.png"
+              alt="Cyber Chakra Forensics"
+              className="h-10 w-10 shrink-0 rounded-xl object-contain bg-[hsl(var(--muted)/0.5)] p-1"
+            />
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))]">
                 Software Distribution
@@ -975,7 +979,7 @@ export function DownloadsPage() {
                 {loading
                   ? "Loading releases..."
                   : releases.length === 0
-                    ? "Manage and distribute software releases"
+                    ? "Manage and distribute CMF software releases"
                     : `${releases.length} published ${releases.length === 1 ? "release" : "releases"} available`}
               </p>
             </div>
@@ -1055,10 +1059,11 @@ export function DownloadsPage() {
 
           {/* Empty state */}
           {filteredReleases.length === 0 && (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--card)/0.5)] py-20 px-6">
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--card)/0.5)] py-24 px-6">
               {/* Illustration area */}
-              <div className="relative mb-6">
-                <div className="absolute -inset-4 rounded-full bg-[hsl(var(--primary)/0.05)]" />
+              <div className="relative mb-4">
+                <div className="absolute -inset-5 rounded-full bg-[hsl(var(--primary)/0.06)]" />
+                <div className="absolute -inset-10 rounded-full bg-[hsl(var(--primary)/0.03)]" />
                 <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--muted))]">
                   <UploadCloud className="h-10 w-10 text-[hsl(var(--muted-foreground)/0.5)]" />
                 </div>
@@ -1066,7 +1071,7 @@ export function DownloadsPage() {
 
               {searchQuery || channelFilter !== "all" ? (
                 <>
-                  <h3 className="text-base font-semibold text-[hsl(var(--foreground))]">
+                  <h3 className="text-lg font-semibold text-[hsl(var(--foreground))]">
                     No releases found
                   </h3>
                   <p className="mt-2 max-w-sm text-center text-sm text-[hsl(var(--muted-foreground))]">
@@ -1085,27 +1090,25 @@ export function DownloadsPage() {
                 </>
               ) : (
                 <>
-                  <h3 className="text-base font-semibold text-[hsl(var(--foreground))]">
-                    No downloads available
+                  <h3 className="text-lg font-semibold text-[hsl(var(--foreground))]">
+                    No downloads available yet
                   </h3>
-                  <p className="mt-2 max-w-md text-center text-sm text-[hsl(var(--muted-foreground))]">
-                    Publish a release first, then it will appear here for download.
-                  </p>
-                  <p className="mt-1.5 max-w-sm text-center text-xs text-[hsl(var(--muted-foreground)/0.6)]">
-                    Create and publish releases from the Releases page to make installers available.
+                  <p className="mt-2 max-w-md text-center text-sm leading-relaxed text-[hsl(var(--muted-foreground))]">
+                    Publish a release from the Releases page to make software installers available for download here.
                   </p>
                   <Button
-                    className="mt-5 gap-2 bg-[hsl(var(--primary))] text-white hover:bg-[hsl(var(--primary)/0.9)]"
+                    size="lg"
+                    className="mt-6 gap-2.5 bg-[hsl(var(--primary))] px-8 text-white shadow-lg shadow-[hsl(var(--primary)/0.2)] hover:bg-[hsl(var(--primary)/0.9)] hover:shadow-xl hover:shadow-[hsl(var(--primary)/0.25)]"
                     onClick={() => navigate("/releases")}
                   >
-                    <Package className="h-4 w-4" />
+                    <Package className="h-5 w-5" />
                     Go to Releases
                   </Button>
                 </>
               )}
 
               {/* Security notice integrated into empty state */}
-              <div className="mt-8 flex items-start gap-2.5 rounded-lg border border-[hsl(var(--border)/0.3)] bg-[hsl(var(--muted)/0.1)] p-3.5 max-w-lg text-xs text-[hsl(var(--muted-foreground)/0.6)]">
+              <div className="mt-10 flex items-start gap-2.5 rounded-lg border border-[hsl(var(--border)/0.3)] bg-[hsl(var(--muted)/0.1)] p-3.5 max-w-lg text-xs text-[hsl(var(--muted-foreground)/0.6)]">
                 <Shield className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--primary)/0.4)]" />
                 <p>
                   All installers are code-signed and include SHA-256 checksums for

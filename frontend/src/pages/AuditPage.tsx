@@ -11,6 +11,12 @@ import {
   Monitor,
   User,
   Shield,
+  Plus,
+  Pencil,
+  Trash2,
+  LogIn,
+  Cpu,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,32 +84,42 @@ const ACTION_CATEGORIES: Record<string, ActionCategory> = {
 
 const CATEGORY_STYLES: Record<
   ActionCategory,
-  { bg: string; text: string; label: string }
+  { bg: string; text: string; border: string; label: string; icon: typeof Plus }
 > = {
   create: {
-    bg: "bg-[hsl(var(--success)/0.12)]",
+    bg: "bg-[hsl(var(--success)/0.1)]",
     text: "text-[hsl(var(--success))]",
+    border: "border-[hsl(var(--success)/0.2)]",
     label: "Create",
+    icon: Plus,
   },
   update: {
-    bg: "bg-[hsl(210_100%_50%/0.12)]",
+    bg: "bg-[hsl(210_100%_50%/0.1)]",
     text: "text-[hsl(210_100%_50%)]",
+    border: "border-[hsl(210_100%_50%/0.2)]",
     label: "Update",
+    icon: Pencil,
   },
   delete: {
-    bg: "bg-[hsl(var(--destructive)/0.12)]",
+    bg: "bg-[hsl(var(--destructive)/0.1)]",
     text: "text-[hsl(var(--destructive))]",
+    border: "border-[hsl(var(--destructive)/0.2)]",
     label: "Delete",
+    icon: Trash2,
   },
   auth: {
-    bg: "bg-[hsl(var(--muted))]",
+    bg: "bg-[hsl(var(--muted)/0.6)]",
     text: "text-[hsl(var(--muted-foreground))]",
+    border: "border-[hsl(var(--border))]",
     label: "Auth",
+    icon: LogIn,
   },
   system: {
-    bg: "bg-[hsl(270_60%_60%/0.12)]",
+    bg: "bg-[hsl(270_60%_60%/0.1)]",
     text: "text-[hsl(270_60%_60%)]",
+    border: "border-[hsl(270_60%_60%/0.2)]",
     label: "System",
+    icon: Cpu,
   },
 };
 
@@ -151,20 +167,19 @@ const RESOURCE_OPTIONS = [
 // Formatting helpers
 // ---------------------------------------------------------------------------
 
-function formatTimestamp(iso: string): string {
+function formatTimestamp(iso: string): { date: string; time: string } {
   const d = new Date(iso);
-  return d.toLocaleDateString("en-US", {
+  const date = d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
-  }) +
-    " " +
-    d.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true,
-    });
+  });
+  const time = d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+  return { date, time };
 }
 
 function formatActionLabel(action: string): string {
@@ -205,11 +220,11 @@ function JsonBlock({
   if (!data) {
     return (
       <div>
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
           {label}
         </p>
-        <div className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] px-3 py-2">
-          <span className="font-mono text-xs text-[hsl(var(--muted-foreground))]">
+        <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.2)] px-4 py-3">
+          <span className="font-mono text-xs italic text-[hsl(var(--muted-foreground)/0.6)]">
             null
           </span>
         </div>
@@ -219,10 +234,10 @@ function JsonBlock({
 
   return (
     <div>
-      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
         {label}
       </p>
-      <div className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] px-3 py-2.5">
+      <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.2)] px-4 py-3 overflow-x-auto max-h-64 overflow-y-auto">
         <pre className="font-mono text-xs leading-relaxed text-[hsl(var(--foreground)/0.85)]">
           {JSON.stringify(data, null, 2)}
         </pre>
@@ -270,26 +285,38 @@ function TableSkeleton() {
 
 function ExpandedDetail({ entry }: { entry: AuditLogEntry }) {
   const actor = resolveActor(entry);
+  const style = getActionStyle(entry.action);
+  const ActionIcon = style.icon;
 
   return (
-    <TableRow className="bg-[hsl(var(--muted)/0.25)] hover:bg-[hsl(var(--muted)/0.25)]">
-      <TableCell colSpan={6} className="px-6 py-4">
-        <div className="space-y-4">
+    <TableRow className="bg-[hsl(var(--muted)/0.15)] hover:bg-[hsl(var(--muted)/0.15)] border-b border-[hsl(var(--border)/0.5)]">
+      <TableCell colSpan={6} className="px-6 py-5">
+        <div className="space-y-5">
           {/* Top meta row */}
-          <div className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
                 Action
               </p>
-              <p className="mt-0.5 text-sm font-medium text-[hsl(var(--foreground))]">
-                {formatActionLabel(entry.action)}
-              </p>
+              <div className="mt-1.5 flex items-center gap-1.5">
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-semibold",
+                    style.bg,
+                    style.text,
+                    style.border
+                  )}
+                >
+                  <ActionIcon className="h-3 w-3" />
+                  {formatActionLabel(entry.action)}
+                </span>
+              </div>
             </div>
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
                 Actor
               </p>
-              <p className="mt-0.5 text-sm text-[hsl(var(--foreground))]">
+              <p className="mt-1.5 text-sm text-[hsl(var(--foreground))]">
                 {actor.label}
               </p>
             </div>
@@ -297,31 +324,33 @@ function ExpandedDetail({ entry }: { entry: AuditLogEntry }) {
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
                 Full IP Address
               </p>
-              <p className="mt-0.5 font-mono text-sm text-[hsl(var(--foreground))]">
+              <code className="mt-1.5 inline-block rounded bg-[hsl(var(--muted)/0.4)] px-2 py-0.5 font-mono text-xs text-[hsl(var(--foreground))]">
                 {entry.ipAddress}
-              </p>
+              </code>
             </div>
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
                 Resource
               </p>
-              <p className="mt-0.5 text-sm text-[hsl(var(--foreground))]">
+              <p className="mt-1.5 text-sm text-[hsl(var(--foreground))]">
                 {entry.resourceType}{" "}
-                <span className="font-mono text-[hsl(var(--muted-foreground))]">
+                <code className="rounded bg-[hsl(var(--muted)/0.4)] px-1.5 py-0.5 font-mono text-xs text-[hsl(var(--muted-foreground))]">
                   {entry.resourceId}
-                </span>
+                </code>
               </p>
             </div>
           </div>
 
           {/* User Agent */}
           <div>
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
               User Agent
             </p>
-            <p className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] px-3 py-1.5 font-mono text-xs text-[hsl(var(--foreground)/0.75)]">
-              {entry.userAgent}
-            </p>
+            <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.2)] px-3 py-2">
+              <code className="font-mono text-xs text-[hsl(var(--foreground)/0.75)] break-all">
+                {entry.userAgent}
+              </code>
+            </div>
           </div>
 
           {/* Old / New values */}
@@ -470,7 +499,10 @@ export function AuditPage() {
             System-wide audit trail and compliance logs.
           </p>
         </div>
-        <Button variant="outline" disabled>
+        <Button
+          disabled
+          className="bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(230_65%_55%)] text-white shadow-md hover:shadow-lg hover:brightness-110 transition-all duration-200 gap-2"
+        >
           <Download className="h-4 w-4" />
           Export CSV
         </Button>
@@ -480,15 +512,17 @@ export function AuditPage() {
       {/* Filter Bar                                                          */}
       {/* ------------------------------------------------------------------ */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-            {/* Action type */}
-            <div className="flex-1 space-y-1">
-              <label className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                Action
-              </label>
+        <CardContent className="px-4 py-3">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+            <div className="flex items-center gap-1.5 text-[hsl(var(--muted-foreground))]">
+              <Filter className="h-3.5 w-3.5" />
+              <span className="text-xs font-medium">Filters</span>
+            </div>
+
+            <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+              {/* Action type */}
               <Select value={actionFilter} onValueChange={setActionFilter}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="h-8 w-full text-xs sm:w-44">
                   <SelectValue placeholder="All Actions" />
                 </SelectTrigger>
                 <SelectContent>
@@ -499,15 +533,10 @@ export function AuditPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
 
-            {/* Resource type */}
-            <div className="flex-1 space-y-1">
-              <label className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                Resource
-              </label>
+              {/* Resource type */}
               <Select value={resourceFilter} onValueChange={setResourceFilter}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="h-8 w-full text-xs sm:w-40">
                   <SelectValue placeholder="All Resources" />
                 </SelectTrigger>
                 <SelectContent>
@@ -518,46 +547,38 @@ export function AuditPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
 
-            {/* Date from */}
-            <div className="flex-1 space-y-1">
-              <label className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                From
-              </label>
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full"
-              />
-            </div>
-
-            {/* Date to */}
-            <div className="flex-1 space-y-1">
-              <label className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
-                To
-              </label>
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="w-full"
-              />
+              {/* Date range inline */}
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="h-8 w-full text-xs sm:w-36"
+                  placeholder="From"
+                />
+                <span className="text-xs text-[hsl(var(--muted-foreground))]">to</span>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="h-8 w-full text-xs sm:w-36"
+                  placeholder="To"
+                />
+              </div>
             </div>
 
             {/* Buttons */}
-            <div className="flex items-end gap-2">
-              <Button onClick={handleApplyFilters} size="sm">
-                <Filter className="h-3.5 w-3.5" />
-                Apply Filters
+            <div className="flex items-center gap-1.5">
+              <Button onClick={handleApplyFilters} size="sm" className="h-8 px-3 text-xs">
+                Apply
               </Button>
               {hasActiveFilters && (
                 <Button
                   onClick={handleClearFilters}
                   variant="ghost"
                   size="sm"
-                  className="text-[hsl(var(--muted-foreground))]"
+                  className="h-8 px-2 text-xs text-[hsl(var(--muted-foreground))]"
                 >
                   <X className="h-3.5 w-3.5" />
                   Clear
@@ -611,82 +632,98 @@ export function AuditPage() {
               ) : (
                 paginated.map((entry) => {
                   const style = getActionStyle(entry.action);
+                  const ActionIcon = style.icon;
                   const actor = resolveActor(entry);
                   const isExpanded = expandedId === entry.id;
+                  const ts = formatTimestamp(entry.createdAt);
+                  const actorInitial = actor.label.charAt(0).toUpperCase();
 
                   return (
                     <Fragment key={entry.id}>
                       <TableRow
                         className={cn(
-                          "cursor-pointer transition-colors",
+                          "cursor-pointer transition-colors group",
                           isExpanded &&
                             "bg-[hsl(var(--muted)/0.35)] hover:bg-[hsl(var(--muted)/0.35)]"
                         )}
                         onClick={() => toggleRow(entry.id)}
                       >
                         {/* Timestamp */}
-                        <TableCell className="font-mono text-xs text-[hsl(var(--muted-foreground))]">
-                          {formatTimestamp(entry.createdAt)}
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="text-sm text-[hsl(var(--foreground))]">
+                              {ts.date}
+                            </span>
+                            <span className="text-[11px] text-[hsl(var(--muted-foreground))]">
+                              {ts.time}
+                            </span>
+                          </div>
                         </TableCell>
 
-                        {/* Action badge */}
+                        {/* Action badge with icon */}
                         <TableCell>
                           <span
                             className={cn(
-                              "inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold",
+                              "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-semibold",
                               style.bg,
-                              style.text
+                              style.text,
+                              style.border
                             )}
                           >
+                            <ActionIcon className="h-3 w-3" />
                             {formatActionLabel(entry.action)}
                           </span>
                         </TableCell>
 
-                        {/* Resource */}
+                        {/* Resource - subtle tag */}
                         <TableCell>
                           <div className="flex items-center gap-1.5">
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] font-normal"
-                            >
+                            <span className="inline-flex items-center gap-1 rounded bg-[hsl(var(--muted)/0.5)] px-2 py-0.5 text-[10px] font-medium text-[hsl(var(--muted-foreground))]">
+                              <FileText className="h-2.5 w-2.5" />
                               {entry.resourceType}
-                            </Badge>
+                            </span>
                             <span className="font-mono text-xs text-[hsl(var(--muted-foreground))]">
                               {entry.resourceId}
                             </span>
                           </div>
                         </TableCell>
 
-                        {/* Actor */}
+                        {/* Actor with avatar initial */}
                         <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            {actor.kind === "admin" && (
-                              <User className="h-3.5 w-3.5 text-[hsl(var(--muted-foreground))]" />
-                            )}
-                            {actor.kind === "app" && (
-                              <Monitor className="h-3.5 w-3.5 text-[hsl(var(--muted-foreground))]" />
-                            )}
-                            {actor.kind === "system" && (
-                              <Shield className="h-3.5 w-3.5 text-[hsl(var(--muted-foreground))]" />
-                            )}
+                          <div className="flex items-center gap-2">
+                            <div className={cn(
+                              "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
+                              actor.kind === "admin" && "bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))]",
+                              actor.kind === "app" && "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]",
+                              actor.kind === "system" && "bg-[hsl(270_60%_60%/0.1)] text-[hsl(270_60%_60%)]"
+                            )}>
+                              {actorInitial}
+                            </div>
                             <span className="text-sm text-[hsl(var(--foreground))]">
                               {actor.label}
                             </span>
                           </div>
                         </TableCell>
 
-                        {/* IP Address */}
-                        <TableCell className="font-mono text-xs text-[hsl(var(--muted-foreground))]">
-                          {entry.ipAddress}
+                        {/* IP Address - monospace */}
+                        <TableCell>
+                          <code className="rounded bg-[hsl(var(--muted)/0.4)] px-1.5 py-0.5 font-mono text-[11px] text-[hsl(var(--muted-foreground))]">
+                            {entry.ipAddress}
+                          </code>
                         </TableCell>
 
                         {/* Expand indicator */}
                         <TableCell className="text-center">
-                          {isExpanded ? (
-                            <ChevronUp className="inline-block h-4 w-4 text-[hsl(var(--muted-foreground))]" />
-                          ) : (
-                            <ChevronDown className="inline-block h-4 w-4 text-[hsl(var(--muted-foreground))]" />
-                          )}
+                          <div className={cn(
+                            "inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors",
+                            isExpanded ? "bg-[hsl(var(--muted))]" : "group-hover:bg-[hsl(var(--muted)/0.5)]"
+                          )}>
+                            {isExpanded ? (
+                              <ChevronUp className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
 

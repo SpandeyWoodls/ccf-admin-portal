@@ -2,13 +2,13 @@
 
 @layer base {
   :root {
-    --background: 220 14% 96%;
+    --background: 220 20% 97%;
     --foreground: 220 14% 10%;
     --card: 0 0% 100%;
     --card-foreground: 220 14% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 220 14% 10%;
-    --primary: 213 72% 48%;
+    --primary: 217 91% 50%;
     --primary-foreground: 0 0% 100%;
     --secondary: 220 14% 92%;
     --secondary-foreground: 220 14% 20%;
@@ -18,7 +18,7 @@
     --accent-foreground: 220 14% 20%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 13% 87%;
+    --border: 220 15% 90%;
     --input: 220 13% 87%;
     --ring: 213 72% 48%;
     --radius: 0.75rem;
@@ -67,7 +67,7 @@
   }
   body {
     @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))] antialiased;
-    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Display", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   }
 }
 
@@ -92,5 +92,62 @@
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, hsl(213 72% 48%), hsl(230 65% 55%));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .animate-pulse-dot {
+    animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .animate-pulse-dot-red {
+    animation: pulse-dot-red 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .page-fade-in {
+    animation: pageFadeIn 0.3s ease-out both;
+  }
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 hsl(var(--success) / 0.5);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 0 4px hsl(var(--success) / 0);
+  }
+}
+
+@keyframes pulse-dot-red {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 hsl(var(--destructive) / 0.5);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 0 4px hsl(var(--destructive) / 0);
+  }
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
