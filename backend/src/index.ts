@@ -176,19 +176,22 @@ app.get("/license/update-check.php", (req, res) => {
 // ─── Serve frontend static files (production) ─────────────────────────────
 
 import path from "path";
-const frontendDist = path.join(__dirname, "../../frontend/dist");
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendDist = path.resolve(__dirname, "../../frontend/dist");
+
 app.use(express.static(frontendDist));
 
 // SPA fallback: serve index.html for all non-API routes
 app.get("*", (req, res, next) => {
-  // Don't serve index.html for API routes
   if (req.path.startsWith("/api/")) {
     return next();
   }
   const indexPath = path.join(frontendDist, "index.html");
   res.sendFile(indexPath, (err) => {
     if (err) {
-      // Frontend not built or not present -- return 404
       next();
     }
   });
