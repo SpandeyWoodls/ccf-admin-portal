@@ -90,12 +90,22 @@ app.use((_req, res, next) => {
   next();
 });
 
+const corsOrigins = process.env.CORS_ORIGIN === "*"
+  ? "*"
+  : (process.env.CORS_ORIGIN?.split(",").map((s) => s.trim()) || ["http://localhost:5173"]);
+
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN?.split(",").map((s) => s.trim()) || "http://localhost:5173",
-    credentials: true,
+    origin: corsOrigins === "*" ? true : corsOrigins,
+    credentials: corsOrigins !== "*",
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-License-Key", "X-Hardware-Fingerprint", "X-App-Channel"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-License-Key",
+      "X-Hardware-Fingerprint",
+      "X-App-Channel",
+    ],
   }),
 );
 

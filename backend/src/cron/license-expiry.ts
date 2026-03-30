@@ -1,4 +1,6 @@
 import { prisma } from "../lib/prisma.js";
+import { sendEmail } from "../services/email.js";
+import { licenseExpiryWarningEmail, licenseExpiredEmail } from "../services/email-templates.js";
 
 /**
  * Find all licenses where validUntil < now() AND status = 'active',
@@ -12,6 +14,34 @@ export async function checkLicenseExpiry(): Promise<number> {
 
   try {
     const now = new Date();
+
+    // Send warning emails for licenses expiring within 7 days
+    const expiringLicenses = await prisma.license.findMany({
+      where: {
+        status: "active",
+        validUntil: {
+          gte: now,
+          lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
+      },
+      include: { organization: true },
+    });
+
+    for (const license of expiringLicenses) {
+      if (license.organization?.email) {
+        const daysRemaining = Math.ceil((license.validUntil!.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+        const { subject, html } = licenseExpiryWarningEmail(
+          license.organization.name,
+          license.licenseKey,
+          daysRemaining
+        );
+        sendEmail(license.organization.email, subject, html).catch(() => {});
+      }
+    }
+
+    if (expiringLicenses.length > 0) {
+      console.log(`[Cron:${jobName}] Sent expiry warnings for ${expiringLicenses.length} license(s).`);
+    }
 
     // Find all active licenses that have expired
     const expiredLicenses = await prisma.license.findMany({
@@ -27,6 +57,7 @@ export async function checkLicenseExpiry(): Promise<number> {
         licenseKey: true,
         organizationId: true,
         validUntil: true,
+        organization: { select: { name: true, email: true } },
       },
     });
 
@@ -65,6 +96,15 @@ export async function checkLicenseExpiry(): Promise<number> {
           },
         }),
       ]);
+
+      // Send license expired email
+      if (license.organization?.email) {
+        const { subject, html } = licenseExpiredEmail(
+          license.organization.name,
+          license.licenseKey
+        );
+        sendEmail(license.organization.email, subject, html).catch(() => {});
+      }
     }
 
     console.log(

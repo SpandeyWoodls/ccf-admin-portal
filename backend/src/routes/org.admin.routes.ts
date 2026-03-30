@@ -5,6 +5,9 @@ import { requireAuth, requireRole } from "../middleware/auth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { logAudit } from "../lib/audit.js";
 import { paginated } from "../lib/response.js";
+import { parsePagination } from "../lib/pagination.js";
+import { sendEmail } from "../services/email.js";
+import { welcomeEmail } from "../services/email-templates.js";
 
 const router = Router();
 
@@ -81,19 +84,25 @@ const createContactSchema = z.object({
  */
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 20));
+    const { page, pageSize } = parsePagination(req.query as Record<string, unknown>);
     const skip = (page - 1) * pageSize;
 
     const where: any = {};
-    if (req.query.orgType) where.orgType = req.query.orgType;
+
+    const validOrgTypes = ["government", "law_enforcement", "corporate", "academic", "private_lab", "individual"];
+    if (req.query.orgType && validOrgTypes.includes(req.query.orgType as string)) {
+      where.orgType = req.query.orgType as string;
+    }
+
     if (req.query.isActive !== undefined) where.isActive = req.query.isActive === "true";
-    if (req.query.search) {
+
+    const search = typeof req.query.search === "string" ? req.query.search.slice(0, 200) : undefined;
+    if (search) {
       where.OR = [
-        { name: { contains: req.query.search as string } },
-        { slug: { contains: req.query.search as string } },
-        { email: { contains: req.query.search as string } },
-        { city: { contains: req.query.search as string } },
+        { name: { contains: search } },
+        { slug: { contains: search } },
+        { email: { contains: search } },
+        { city: { contains: search } },
       ];
     }
 
@@ -271,6 +280,12 @@ router.post(
         ipAddress: req.ip ?? null,
         userAgent: req.headers["user-agent"] ?? null,
       });
+
+      // Send welcome email
+      if (org.email) {
+        const { subject, html } = welcomeEmail(body.name, org.name);
+        sendEmail(org.email, subject, html).catch(() => {});
+      }
 
       res.status(201).json({ success: true, data: org, error: null, message: "Organization created" });
     } catch (err) {

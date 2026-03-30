@@ -70,15 +70,13 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     return;
   }
 
-  // Unexpected errors
+  // Unexpected errors — hide details in production
   console.error("[UNHANDLED ERROR]", err);
+  const isProduction = process.env.NODE_ENV === "production";
   res.status(500).json({
     success: false,
     data: null,
     error: "INTERNAL_ERROR",
-    message:
-      process.env.NODE_ENV === "development"
-        ? err.message
-        : "An unexpected error occurred",
+    message: isProduction ? "An unexpected error occurred" : err.message,
   });
 }

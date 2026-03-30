@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { paginated } from "../lib/response.js";
+import { parsePagination } from "../lib/pagination.js";
 
 const router = Router();
 
@@ -10,24 +11,35 @@ router.use(requireRole("admin", "super_admin"));
 
 // ─── GET / (list audit logs) ────────────────────────────────────────────────
 
+function parseDate(value: unknown): Date | null {
+  if (!value || typeof value !== "string") return null;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 50));
+    const { page, pageSize } = parsePagination(req.query as Record<string, unknown>);
     const skip = (page - 1) * pageSize;
 
     const where: any = {};
 
-    if (req.query.action) where.action = req.query.action;
-    if (req.query.resourceType) where.resourceType = req.query.resourceType;
+    if (req.query.action && typeof req.query.action === "string") {
+      where.action = req.query.action.slice(0, 100);
+    }
+    if (req.query.resourceType && typeof req.query.resourceType === "string") {
+      where.resourceType = req.query.resourceType.slice(0, 100);
+    }
     if (req.query.adminUserId) where.adminUserId = req.query.adminUserId;
     if (req.query.resourceId) where.resourceId = req.query.resourceId;
 
-    // Date range filter
-    if (req.query.from || req.query.to) {
+    // Date range filter with validation
+    const fromDate = parseDate(req.query.from);
+    const toDate = parseDate(req.query.to);
+    if (fromDate || toDate) {
       where.createdAt = {};
-      if (req.query.from) where.createdAt.gte = new Date(req.query.from as string);
-      if (req.query.to) where.createdAt.lte = new Date(req.query.to as string);
+      if (fromDate) where.createdAt.gte = fromDate;
+      if (toDate) where.createdAt.lte = toDate;
     }
 
     const [logs, total] = await Promise.all([

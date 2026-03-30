@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from "../middleware/auth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { logAudit } from "../lib/audit.js";
 import { paginated } from "../lib/response.js";
+import { parsePagination } from "../lib/pagination.js";
 
 const router = Router();
 
@@ -34,13 +35,16 @@ const updateAnnouncementSchema = createAnnouncementSchema.partial();
 
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 20));
+    const { page, pageSize } = parsePagination(req.query as Record<string, unknown>);
     const skip = (page - 1) * pageSize;
 
     const where: any = {};
     if (req.query.isActive !== undefined) where.isActive = req.query.isActive === "true";
-    if (req.query.announcementType) where.announcementType = req.query.announcementType;
+
+    const validAnnouncementTypes = ["info", "warning", "critical", "maintenance"];
+    if (req.query.announcementType && validAnnouncementTypes.includes(req.query.announcementType as string)) {
+      where.announcementType = req.query.announcementType as string;
+    }
 
     const [announcements, total] = await Promise.all([
       prisma.announcement.findMany({

@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
 });
 
 const FROM_EMAIL = process.env.SMTP_FROM || "noreply@cyberchakra.in";
-const PORTAL_URL = process.env.PORTAL_URL || "https://admin.cyberchakra.in";
+const PORTAL_URL = process.env.PORTAL_URL || "https://cyberchakra.online";
 
 // ─── Send email utility ────────────────────────────────────────────────────
 

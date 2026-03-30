@@ -420,7 +420,7 @@ export function AnalyticsPage() {
                   <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--muted)/0.9)] backdrop-blur-sm">
                     <TrendingUp className="h-7 w-7 text-[hsl(var(--muted-foreground)/0.6)]" />
                   </div>
-                  <p className="mt-3 text-sm font-medium text-[hsl(var(--muted-foreground))]">{stats!.activationsOverTime.length} data points available</p>
+                  <p className="mt-3 text-sm font-medium text-[hsl(var(--muted-foreground))]">{stats?.activationsOverTime?.length ?? 0} data points available</p>
                   <p className="mt-1.5 text-xs text-[hsl(var(--muted-foreground)/0.5)]">Chart rendering available when recharts is connected</p>
                 </div>
               </div>
@@ -459,8 +459,8 @@ export function AnalyticsPage() {
           <CardContent>
             {hasTierData ? (
               <div className="space-y-3.5 py-4">
-                {stats!.licensesByTier.map((item, idx) => {
-                  const total = stats!.licensesByTier.reduce((sum, t) => sum + t.count, 0) || 1;
+                {(stats?.licensesByTier ?? []).map((item, idx) => {
+                  const total = (stats?.licensesByTier ?? []).reduce((sum, t) => sum + t.count, 0) || 1;
                   const pct = (item.count / total) * 100;
                   const colors = [CHART_COLORS.chart1, CHART_COLORS.chart2, CHART_COLORS.chart3, CHART_COLORS.chart4, CHART_COLORS.chart5];
                   const barColor = colors[idx % colors.length];
@@ -528,8 +528,8 @@ export function AnalyticsPage() {
           <CardContent>
             {hasStatusData ? (
               <div className="space-y-3.5 py-4">
-                {stats!.licensesByStatus.map((item) => {
-                  const total = stats!.licensesByStatus.reduce((sum, s) => sum + s.count, 0) || 1;
+                {(stats?.licensesByStatus ?? []).map((item) => {
+                  const total = (stats?.licensesByStatus ?? []).reduce((sum, s) => sum + s.count, 0) || 1;
                   const pct = (item.count / total) * 100;
                   const color =
                     item.status === "active" ? CHART_COLORS.success

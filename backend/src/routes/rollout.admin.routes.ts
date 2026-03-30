@@ -121,6 +121,7 @@ router.post(
 
 router.get(
   "/releases/:id/rollout",
+  requireRole("admin", "super_admin"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const releaseId = req.params.id as string;
@@ -402,6 +403,7 @@ router.post(
 
 router.get(
   "/blocked-versions",
+  requireRole("admin", "super_admin"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const includeInactive = req.query.includeInactive === "true";

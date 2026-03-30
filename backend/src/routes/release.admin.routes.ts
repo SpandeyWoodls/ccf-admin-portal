@@ -5,6 +5,9 @@ import { requireAuth, requireRole } from "../middleware/auth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { logAudit } from "../lib/audit.js";
 import { paginated } from "../lib/response.js";
+import { parsePagination } from "../lib/pagination.js";
+import { sendEmail } from "../services/email.js";
+import { newReleaseEmail } from "../services/email-templates.js";
 
 const router = Router();
 
@@ -52,12 +55,16 @@ const updateReleaseSchema = z.object({
 
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 20));
+    const { page, pageSize } = parsePagination(req.query as Record<string, unknown>);
     const skip = (page - 1) * pageSize;
 
     const where: any = {};
-    if (req.query.channel) where.channel = req.query.channel;
+
+    const validChannels = ["stable", "beta", "rc"];
+    if (req.query.channel && validChannels.includes(req.query.channel as string)) {
+      where.channel = req.query.channel as string;
+    }
+
     if (req.query.isBlocked !== undefined) where.isBlocked = req.query.isBlocked === "true";
 
     const [releases, total] = await Promise.all([
@@ -133,7 +140,7 @@ router.post(
               arch: a.arch,
               packageType: a.packageType,
               filename: a.filename,
-              fileSize: BigInt(a.fileSize),
+              fileSize: Number(a.fileSize),
               sha256Hash: a.sha256Hash,
               downloadUrl: a.downloadUrl,
               signature: a.signature ?? null,
@@ -234,6 +241,25 @@ router.post(
         ipAddress: req.ip ?? null,
         userAgent: req.headers["user-agent"] ?? null,
       });
+
+      // Notify all active organizations about the new release
+      const orgs = await prisma.organization.findMany({
+        where: { isActive: true, email: { not: null } },
+        select: { email: true, name: true },
+      });
+      for (const org of orgs) {
+        if (org.email) {
+          const { subject, html } = newReleaseEmail(
+            updated.version,
+            updated.title,
+            updated.releaseNotes || "",
+            `https://cyberchakra.online/downloads`
+          );
+          sendEmail(org.email, subject, html).catch(err => {
+            console.error(`[Email] Failed to send to ${org.email}:`, err.message);
+          });
+        }
+      }
 
       res.json({ success: true, data: updated, error: null, message: "Release published" });
     } catch (err) {

@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { desktopResponse } from "../lib/response.js";
+import { uuidToNumericId } from "../lib/validation-token.js";
 import { sendEmail } from "../services/email.js";
 
 const router = Router();
@@ -43,7 +44,7 @@ router.post("/trial-request", async (req: Request, res: Response, next: NextFunc
       if (existing.status === "pending") {
         res.json(
           desktopResponse(true, {
-            request_id: existing.id,
+            request_id: uuidToNumericId(existing.id),
             status: "pending",
             message: "A trial request is already pending for this machine",
           }, null, "Trial request already submitted"),
@@ -54,7 +55,7 @@ router.post("/trial-request", async (req: Request, res: Response, next: NextFunc
       if (existing.status === "approved" && existing.approvedLicenseKey) {
         res.json(
           desktopResponse(true, {
-            request_id: existing.id,
+            request_id: uuidToNumericId(existing.id),
             status: "approved",
             license_key: existing.approvedLicenseKey,
           }, null, "Trial already approved"),
@@ -87,12 +88,14 @@ router.post("/trial-request", async (req: Request, res: Response, next: NextFunc
     sendEmail(
       process.env.SMTP_FROM || "admin@cyberchakra.in",
       `New Trial Request: ${body.organization}`,
-      `<p>New trial request received from <strong>${body.full_name}</strong> (${body.email}) at <strong>${body.organization}</strong> (${body.organization_type}).</p><p>Purpose: ${body.purpose}</p><p>Review it in the <a href="${process.env.PORTAL_URL || "https://admin.cyberchakra.in"}/trial-requests">Admin Portal</a>.</p>`,
-    ).catch(() => {});
+      `<p>New trial request received from <strong>${body.full_name}</strong> (${body.email}) at <strong>${body.organization}</strong> (${body.organization_type}).</p><p>Purpose: ${body.purpose}</p><p>Review it in the <a href="${process.env.PORTAL_URL || "https://cyberchakra.online"}/trial-requests">Admin Portal</a>.</p>`,
+    ).catch(err => {
+      console.error(`[Email] Failed to send to ${process.env.SMTP_FROM || "admin@cyberchakra.in"}:`, err.message);
+    });
 
     res.status(201).json(
       desktopResponse(true, {
-        request_id: trialReq.id,
+        request_id: uuidToNumericId(trialReq.id),
         status: "pending",
       }, null, "Trial request submitted successfully. You will be notified once reviewed."),
     );
@@ -126,7 +129,7 @@ router.get("/trial-request-status", async (req: Request, res: Response, next: Ne
     }
 
     const data: Record<string, any> = {
-      request_id: latestRequest.id,
+      request_id: uuidToNumericId(latestRequest.id),
       status: latestRequest.status,
       submitted_at: latestRequest.createdAt.toISOString(),
     };
@@ -134,6 +137,10 @@ router.get("/trial-request-status", async (req: Request, res: Response, next: Ne
     if (latestRequest.status === "approved" && latestRequest.approvedLicenseKey) {
       data.license_key = latestRequest.approvedLicenseKey;
       data.reviewed_at = latestRequest.reviewedAt?.toISOString() ?? null;
+      data.trial_days = 30;
+      data.expires_at = new Date(
+        (latestRequest.reviewedAt ?? latestRequest.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000,
+      ).toISOString();
     }
 
     if (latestRequest.status === "rejected") {

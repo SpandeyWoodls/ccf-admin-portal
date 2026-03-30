@@ -526,7 +526,7 @@ router.post(
             arch: meta.arch,
             packageType: meta.packageType,
             filename: ghAsset.name,
-            fileSize: BigInt(ghAsset.size),
+            fileSize: Number(ghAsset.size),
             sha256Hash: "pending-verification", // SHA256 not available from GitHub API
             downloadUrl: ghAsset.browser_download_url,
             signature: null,
@@ -580,7 +580,7 @@ router.post(
             arch: a.arch,
             packageType: a.packageType,
             filename: a.filename,
-            fileSize: a.fileSize.toString(),
+            fileSize: Number(a.fileSize),
             downloadUrl: a.downloadUrl,
           })),
         },

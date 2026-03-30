@@ -2,9 +2,11 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { desktopResponse } from "../lib/response.js";
+import { uuidToNumericId } from "../lib/validation-token.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { sendEmail } from "../services/email.js";
 import { ticketReplyEmail } from "../services/email-templates.js";
+import { logAudit } from "../lib/audit.js";
 
 const router = Router();
 
@@ -96,7 +98,9 @@ router.post("/create-ticket", async (req: Request, res: Response, next: NextFunc
     res.status(201).json(
       desktopResponse(true, {
         ticket_number: ticket.ticketNumber,
+        ticket_id: uuidToNumericId(ticket.id),
         status: ticket.status,
+        portal_url: `${process.env.PORTAL_URL || "https://cyberchakra.online"}/support`,
         created_at: ticket.createdAt.toISOString(),
       }, null, "Support ticket created successfully"),
     );
@@ -207,6 +211,7 @@ router.post("/ticket-details", async (req: Request, res: Response, next: NextFun
     res.json(
       desktopResponse(true, {
         ticket_number: ticket.ticketNumber,
+        ticket_id: uuidToNumericId(ticket.id),
         subject: ticket.subject,
         status: ticket.status,
         priority: ticket.priority,
@@ -282,13 +287,24 @@ router.post("/reply-ticket", async (req: Request, res: Response, next: NextFunct
       process.env.SMTP_FROM || "admin@cyberchakra.in",
       emailSubject,
       emailHtml,
-    ).catch(() => {});
+    ).catch(err => {
+      console.error(`[Email] Failed to send to ${process.env.SMTP_FROM || "admin@cyberchakra.in"}:`, err.message);
+    });
+
+    await logAudit({
+      action: "ticket_reply_received",
+      resourceType: "SupportTicket",
+      resourceId: ticket.id,
+      newValues: { ticketNumber: ticket.ticketNumber, messageLength: body.message.length },
+      ipAddress: req.ip ?? null,
+      userAgent: req.headers["user-agent"] ?? null,
+    });
 
     const updatedStatus = ticket.status === "waiting" || ticket.status === "resolved" ? "open" : ticket.status;
 
     res.json(
       desktopResponse(true, {
-        message_id: message.id,
+        reply_id: message.id,
         ticket_number: ticket.ticketNumber,
         status: updatedStatus,
         ticket_status: updatedStatus,

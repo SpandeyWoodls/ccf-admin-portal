@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 const prisma = new PrismaClient();
 
@@ -14,7 +15,8 @@ async function main() {
   if (existing) {
     console.log(`Admin user ${email} already exists, skipping.`);
   } else {
-    const passwordHash = await bcrypt.hash("ChangeMe123!", 12);
+    const randomPassword = crypto.randomBytes(16).toString("hex");
+    const passwordHash = await bcrypt.hash(randomPassword, 12);
 
     const admin = await prisma.adminUser.create({
       data: {
@@ -27,6 +29,8 @@ async function main() {
     });
 
     console.log(`Created super admin: ${admin.email} (id: ${admin.id})`);
+    console.log(`Generated admin password: ${randomPassword}`);
+    console.log("IMPORTANT: Save this password now. It will not be shown again.");
   }
 
   // ─── Default settings ────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import { desktopResponse } from "../lib/response.js";
 import { logLicenseEvent } from "../lib/audit.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { v4 as uuidv4 } from "uuid";
+import semver from "semver";
 import { isAfter, isBefore, addDays } from "date-fns";
 import { shouldReceiveUpdate, getBlockedVersionInfo } from "../services/rollout.js";
 import { generateValidationToken, uuidToNumericId } from "../lib/validation-token.js";
@@ -116,210 +117,178 @@ router.post("/activate", async (req: Request, res: Response, next: NextFunction)
   try {
     const body = activateSchema.parse(req.body);
 
-    const license = await prisma.license.findUnique({
-      where: { licenseKey: body.license_key },
-      include: { activations: true, organization: { select: { name: true } } },
-    });
-
-    if (!license) {
-      res.status(404).json(desktopResponse(false, null, "LICENSE_NOT_FOUND", "License key not found"));
-      return;
-    }
-
-    // Check license status
-    if (license.status === "revoked") {
-      res.status(403).json(desktopResponse(false, null, "LICENSE_REVOKED", "This license has been revoked"));
-      return;
-    }
-    if (license.status === "suspended") {
-      res.status(403).json(desktopResponse(false, null, "LICENSE_SUSPENDED", "This license is suspended"));
-      return;
-    }
-    if (license.status === "expired") {
-      res.status(403).json(desktopResponse(false, null, "LICENSE_EXPIRED", "This license has expired"));
-      return;
-    }
-
-    // Check expiry
-    if (license.validUntil && isAfter(new Date(), license.validUntil)) {
-      await prisma.license.update({
-        where: { id: license.id },
-        data: { status: "expired" },
-      });
-      res.status(403).json(desktopResponse(false, null, "LICENSE_EXPIRED", "This license has expired"));
-      return;
-    }
-
-    // Check if not yet valid
-    if (isBefore(new Date(), license.validFrom)) {
-      res.status(403).json(desktopResponse(false, null, "LICENSE_NOT_YET_VALID", "This license is not yet valid"));
-      return;
-    }
-
-    // Check if already activated on this machine
-    const existingActivation = license.activations.find(
-      (a: any) => a.hardwareFingerprint === body.hardware_fingerprint && a.isActive,
-    );
-
-    if (existingActivation) {
-      // Already activated - update and return success
-      await prisma.licenseActivation.update({
-        where: { id: existingActivation.id },
-        data: {
-          lastValidatedAt: new Date(),
-          appVersion: body.app_version ?? existingActivation.appVersion,
-        },
+    // Use a serializable transaction to prevent race conditions on seat limits.
+    // All reads and writes happen atomically so two concurrent activations
+    // cannot both pass the maxActivations check.
+    const result = await prisma.$transaction(async (tx) => {
+      const license = await tx.license.findUnique({
+        where: { licenseKey: body.license_key },
+        include: { activations: { where: { isActive: true } }, organization: { select: { name: true } } },
       });
 
-      // Update license status to active if it was just issued
-      if (license.status === "issued") {
-        await prisma.license.update({
-          where: { id: license.id },
-          data: { status: "active" },
-        });
+      if (!license) {
+        throw new AppError(404, "License key not found", "LICENSE_NOT_FOUND");
       }
 
-      // Fetch active announcements for the response
-      const existingNow = new Date();
-      const existingAnnouncements = await prisma.announcement.findMany({
-        where: {
-          isActive: true,
-          startsAt: { lte: existingNow },
-          OR: [{ expiresAt: null }, { expiresAt: { gt: existingNow } }],
-        },
-        select: { message: true, announcementType: true },
-      });
+      // Check license status
+      if (license.status === "revoked") {
+        throw new AppError(403, "This license has been revoked", "LICENSE_REVOKED");
+      }
+      if (license.status === "suspended") {
+        throw new AppError(403, "This license is suspended", "LICENSE_SUSPENDED");
+      }
+      if (license.status === "expired") {
+        throw new AppError(403, "This license has expired", "LICENSE_EXPIRED");
+      }
 
-      const existingNextValidation = new Date();
-      existingNextValidation.setDate(existingNextValidation.getDate() + 30);
+      // Check expiry
+      if (license.validUntil && isAfter(new Date(), license.validUntil)) {
+        await tx.license.update({
+          where: { id: license.id },
+          data: { status: "expired" },
+        });
+        throw new AppError(403, "This license has expired", "LICENSE_EXPIRED");
+      }
 
-      const existingValidatedAt = new Date().toISOString();
-      const existingExpiresAt = license.validUntil?.toISOString() ?? "";
-      const existingHmacToken = generateValidationToken(
+      // Check if not yet valid
+      if (isBefore(new Date(), license.validFrom)) {
+        throw new AppError(403, "This license is not yet valid", "LICENSE_NOT_YET_VALID");
+      }
+
+      const activeCount = license.activations.length;
+
+      // Check if already activated on this machine (idempotent)
+      const existingActivation = license.activations.find(
+        (a: any) => a.hardwareFingerprint === body.hardware_fingerprint,
+      );
+
+      if (existingActivation) {
+        // Already activated - update and return success
+        const existingValidatedAt = new Date().toISOString();
+        const existingExpiresAt = license.validUntil?.toISOString() ?? "";
+        const existingHmacToken = generateValidationToken(
+          body.license_key,
+          body.hardware_fingerprint,
+          existingValidatedAt,
+          existingExpiresAt,
+        );
+
+        await tx.licenseActivation.update({
+          where: { id: existingActivation.id },
+          data: {
+            lastValidatedAt: new Date(),
+            appVersion: body.app_version ?? existingActivation.appVersion,
+            validationToken: existingHmacToken,
+          },
+        });
+
+        // Update license status to active if it was just issued
+        if (license.status === "issued") {
+          await tx.license.update({
+            where: { id: license.id },
+            data: { status: "active" },
+          });
+        }
+
+        return { license, activation: existingActivation, isNew: false, hmacToken: existingHmacToken, expiresAt: existingExpiresAt };
+      }
+
+      // Check activation limit INSIDE transaction to prevent race condition
+      if (activeCount >= license.maxActivations) {
+        throw new AppError(
+          403,
+          `Maximum activations (${license.maxActivations}) reached. Deactivate another device first.`,
+          "ACTIVATION_LIMIT_REACHED",
+        );
+      }
+
+      // Generate HMAC validation token for offline validation
+      const activateValidatedAt = new Date().toISOString();
+      const activateExpiresAt = license.validUntil?.toISOString() ?? "";
+      const activateHmacToken = generateValidationToken(
         body.license_key,
         body.hardware_fingerprint,
-        existingValidatedAt,
-        existingExpiresAt,
+        activateValidatedAt,
+        activateExpiresAt,
       );
 
-      // Update the activation record with the new HMAC token
-      await prisma.licenseActivation.update({
-        where: { id: existingActivation.id },
-        data: { validationToken: existingHmacToken },
+      // Create new activation within same transaction
+      const activation = await tx.licenseActivation.create({
+        data: {
+          licenseId: license.id,
+          hardwareFingerprint: body.hardware_fingerprint,
+          machineName: body.machine_name ?? null,
+          osInfo: body.os_info ?? null,
+          userEmail: body.user_email ?? null,
+          appVersion: body.app_version ?? null,
+          ipAddress: (req.ip || req.socket.remoteAddress) ?? null,
+          isActive: true,
+          activatedAt: new Date(),
+          lastValidatedAt: new Date(),
+          validationToken: activateHmacToken,
+        },
       });
 
-      // Response MUST match Rust ServerResponseData struct:
-      // { license_id (int), organization (name string), expires_at, validation_token (HMAC base64), next_validation, announcements }
-      res.json(
-        desktopResponse(true, {
-          license_id: uuidToNumericId(license.id),
-          organization: license.organization?.name ?? "Unknown",
-          expires_at: existingExpiresAt || null,
-          validation_token: existingHmacToken,
-          next_validation: existingNextValidation.toISOString(),
-          announcements: existingAnnouncements.map((a: any) => ({
-            message: a.message,
-            announcement_type: a.announcementType,
-          })),
-        }, null, "License already activated on this machine"),
-      );
-      return;
+      // Update activation count atomically within transaction
+      await tx.license.update({
+        where: { id: license.id },
+        data: {
+          currentActivations: activeCount + 1,
+          status: "active",
+        },
+      });
+
+      return { license, activation, isNew: true, hmacToken: activateHmacToken, expiresAt: activateExpiresAt };
+    });
+
+    // Post-transaction work (audit log, announcements) - outside transaction to keep it short
+
+    if (result.isNew) {
+      await logLicenseEvent({
+        licenseId: result.license.id,
+        activationId: result.activation.id,
+        organizationId: result.license.organizationId,
+        action: "activated",
+        actorType: "desktop_app",
+        actorEmail: body.user_email ?? null,
+        actorIp: (req.ip || req.socket.remoteAddress) ?? null,
+        newValues: {
+          hardware_fingerprint: body.hardware_fingerprint,
+          machine_name: body.machine_name,
+          os_info: body.os_info,
+          app_version: body.app_version,
+        },
+      });
     }
-
-    // Check activation limit
-    const activeCount = license.activations.filter((a: any) => a.isActive).length;
-    if (activeCount >= license.maxActivations) {
-      res.status(403).json(
-        desktopResponse(
-          false,
-          null,
-          "ACTIVATION_LIMIT_REACHED",
-          `Maximum activations (${license.maxActivations}) reached. Deactivate another device first.`,
-        ),
-      );
-      return;
-    }
-
-    // Generate HMAC validation token for offline validation
-    const activateValidatedAt = new Date().toISOString();
-    const activateExpiresAt = license.validUntil?.toISOString() ?? "";
-    const activateHmacToken = generateValidationToken(
-      body.license_key,
-      body.hardware_fingerprint,
-      activateValidatedAt,
-      activateExpiresAt,
-    );
-
-    // Create new activation
-    const activation = await prisma.licenseActivation.create({
-      data: {
-        licenseId: license.id,
-        hardwareFingerprint: body.hardware_fingerprint,
-        machineName: body.machine_name ?? null,
-        osInfo: body.os_info ?? null,
-        userEmail: body.user_email ?? null,
-        appVersion: body.app_version ?? null,
-        ipAddress: (req.ip || req.socket.remoteAddress) ?? null,
-        isActive: true,
-        activatedAt: new Date(),
-        lastValidatedAt: new Date(),
-        validationToken: activateHmacToken,
-      },
-    });
-
-    // Update activation count and status
-    await prisma.license.update({
-      where: { id: license.id },
-      data: {
-        currentActivations: activeCount + 1,
-        status: "active",
-      },
-    });
-
-    await logLicenseEvent({
-      licenseId: license.id,
-      activationId: activation.id,
-      organizationId: license.organizationId,
-      action: "activated",
-      actorType: "desktop_app",
-      actorEmail: body.user_email ?? null,
-      actorIp: (req.ip || req.socket.remoteAddress) ?? null,
-      newValues: {
-        hardware_fingerprint: body.hardware_fingerprint,
-        machine_name: body.machine_name,
-        os_info: body.os_info,
-        app_version: body.app_version,
-      },
-    });
 
     // Fetch active announcements for the response
-    const activateNow = new Date();
-    const activateAnnouncements = await prisma.announcement.findMany({
+    const now = new Date();
+    const announcements = await prisma.announcement.findMany({
       where: {
         isActive: true,
-        startsAt: { lte: activateNow },
-        OR: [{ expiresAt: null }, { expiresAt: { gt: activateNow } }],
+        startsAt: { lte: now },
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
       },
       select: { message: true, announcementType: true },
     });
 
-    const activateNextValidation = new Date();
-    activateNextValidation.setDate(activateNextValidation.getDate() + 30);
+    const nextValidation = new Date();
+    nextValidation.setDate(nextValidation.getDate() + 30);
 
     // Response MUST match Rust ServerResponseData struct:
     // { license_id (int), organization (name string), expires_at, validation_token (HMAC base64), next_validation, announcements }
     res.json(
       desktopResponse(true, {
-        license_id: uuidToNumericId(license.id),
-        organization: (license as any).organization?.name ?? "Unknown",
-        expires_at: activateExpiresAt || null,
-        validation_token: activateHmacToken,
-        next_validation: activateNextValidation.toISOString(),
-        announcements: activateAnnouncements.map((a: any) => ({
+        license_id: uuidToNumericId(result.license.id),
+        organization: result.license.organization?.name ?? "Unknown",
+        expires_at: result.expiresAt || null,
+        validation_token: result.hmacToken,
+        next_validation: nextValidation.toISOString(),
+        announcements: announcements.map((a: any) => ({
           message: a.message,
           announcement_type: a.announcementType,
         })),
-      }, null, "License activated successfully"),
+      }, null, result.isNew ? "License activated successfully" : "License already activated on this machine"),
     );
   } catch (err) {
     next(err);
@@ -894,10 +863,15 @@ updateCheckHandler.get("/", async (req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    // Simple semver comparison: if current_version equals latest, no update
-    if (currentVersion && currentVersion === latestRelease.version) {
-      res.status(204).send();
-      return;
+    // Proper semver comparison: skip update if client is already on latest or newer
+    if (currentVersion && semver.valid(currentVersion) && semver.valid(latestRelease.version)) {
+      if (semver.gte(currentVersion, latestRelease.version)) {
+        // Even if version is current/newer, a forced update must still be delivered
+        if (!latestRelease.forceUpdate) {
+          res.status(204).send(); // Already on latest or newer
+          return;
+        }
+      }
     }
 
     // Check staged rollout: should this client receive the update?
@@ -910,14 +884,23 @@ updateCheckHandler.get("/", async (req: Request, res: Response, next: NextFuncti
 
     const asset = latestRelease.assets[0]!;
 
+    // Don't serve updates without valid signatures
+    if (!asset.signature) {
+      res.status(204).send();
+      return;
+    }
+
     // Return Tauri updater JSON format
+    const notes = latestRelease.forceUpdate
+      ? `[MANDATORY] ${latestRelease.releaseNotes ?? ""}`
+      : (latestRelease.releaseNotes ?? "");
     res.json({
       version: latestRelease.version,
-      notes: latestRelease.releaseNotes ?? "",
+      notes,
       pub_date: latestRelease.publishedAt!.toISOString(),
       platforms: {
         [`${target}-${arch}`]: {
-          signature: asset.signature ?? "",
+          signature: asset.signature,
           url: asset.downloadUrl,
         },
       },

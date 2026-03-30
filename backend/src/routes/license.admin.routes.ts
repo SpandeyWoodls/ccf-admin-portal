@@ -6,6 +6,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import { logAudit, logLicenseEvent } from "../lib/audit.js";
 import { generateLicenseKey } from "../lib/license-key.js";
 import { paginated } from "../lib/response.js";
+import { parsePagination } from "../lib/pagination.js";
 import { addDays, addMonths, addYears } from "date-fns";
 import { sendEmail } from "../services/email.js";
 import { licenseRevokedEmail } from "../services/email-templates.js";
@@ -102,22 +103,35 @@ const renewSchema = z.object({
  */
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 20));
+    const { page, pageSize } = parsePagination(req.query as Record<string, unknown>);
     const skip = (page - 1) * pageSize;
 
     const where: any = {};
 
-    if (req.query.status) where.status = req.query.status;
-    if (req.query.licenseType) where.licenseType = req.query.licenseType;
-    if (req.query.tier) where.tier = req.query.tier;
+    const validStatuses = ["issued", "active", "suspended", "revoked", "expired"];
+    if (req.query.status && validStatuses.includes(req.query.status as string)) {
+      where.status = req.query.status as string;
+    }
+
+    const validLicenseTypes = ["trial", "perpetual", "time_limited", "organization"];
+    if (req.query.licenseType && validLicenseTypes.includes(req.query.licenseType as string)) {
+      where.licenseType = req.query.licenseType as string;
+    }
+
+    const validTiers = ["individual", "team", "enterprise", "government"];
+    if (req.query.tier && validTiers.includes(req.query.tier as string)) {
+      where.tier = req.query.tier as string;
+    }
+
     if (req.query.organizationId) where.organizationId = req.query.organizationId;
-    if (req.query.search) {
+
+    const search = typeof req.query.search === "string" ? req.query.search.slice(0, 200) : undefined;
+    if (search) {
       where.OR = [
-        { licenseKey: { contains: req.query.search as string } },
-        { notes: { contains: req.query.search as string } },
-        { purchaseOrderNumber: { contains: req.query.search as string } },
-        { invoiceNumber: { contains: req.query.search as string } },
+        { licenseKey: { contains: search } },
+        { notes: { contains: search } },
+        { purchaseOrderNumber: { contains: search } },
+        { invoiceNumber: { contains: search } },
       ];
     }
 
@@ -458,11 +472,11 @@ router.post(
 
       await logAudit({
         adminUserId: req.admin!.id,
-        action: "suspend_license",
-        resourceType: "license",
+        action: "license_suspended",
+        resourceType: "License",
         resourceId: existing.id,
-        oldValues: { status: existing.status },
-        newValues: { status: "suspended" },
+        oldValues: { status: "active" },
+        newValues: { status: "suspended", reason: req.body.reason || "No reason provided" },
         ipAddress: req.ip ?? null,
         userAgent: req.headers["user-agent"] ?? null,
       });
@@ -574,10 +588,14 @@ router.post(
                 existing.licenseKey,
                 req.body.reason ?? null,
               );
-              sendEmail(org.email, subject, html).catch(() => {});
+              sendEmail(org.email, subject, html).catch(err => {
+                console.error(`[Email] Failed to send to ${org.email}:`, err.message);
+              });
             }
           })
-          .catch(() => {});
+          .catch(err => {
+            console.error(`[Email] Failed to fetch org for revocation notification:`, err.message);
+          });
       }
 
       res.json({ success: true, data: updated, error: null, message: "License revoked and all activations deactivated" });

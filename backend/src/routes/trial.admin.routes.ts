@@ -6,7 +6,10 @@ import { AppError } from "../middleware/errorHandler.js";
 import { logAudit } from "../lib/audit.js";
 import { generateLicenseKey } from "../lib/license-key.js";
 import { paginated } from "../lib/response.js";
+import { parsePagination } from "../lib/pagination.js";
 import { addMonths } from "date-fns";
+import { sendEmail } from "../services/email.js";
+import { trialApprovedEmail, trialRejectedEmail } from "../services/email-templates.js";
 
 const router = Router();
 
@@ -28,18 +31,18 @@ const rejectTrialSchema = z.object({
 
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const { page, pageSize } = parsePagination({ ...req.query, pageSize: req.query.limit } as Record<string, unknown>);
     const skip = (page - 1) * pageSize;
 
     const where: any = {};
 
-    if (req.query.status) {
-      where.status = req.query.status;
+    const validStatuses = ["pending", "approved", "rejected"];
+    if (req.query.status && validStatuses.includes(req.query.status as string)) {
+      where.status = req.query.status as string;
     }
 
-    if (req.query.search) {
-      const search = req.query.search as string;
+    const search = typeof req.query.search === "string" ? req.query.search.slice(0, 200) : undefined;
+    if (search) {
       where.OR = [
         { fullName: { contains: search } },
         { email: { contains: search } },
@@ -166,6 +169,14 @@ router.post(
         userAgent: req.headers["user-agent"] ?? null,
       });
 
+      // Send trial approval email
+      if (trial.email) {
+        const { subject, html } = trialApprovedEmail(trial.fullName, licenseKey, validUntil.toISOString());
+        sendEmail(trial.email, subject, html).catch(err => {
+          console.error(`[Email] Failed to send to ${trial.email}:`, err.message);
+        });
+      }
+
       res.json({
         success: true,
         data: { trial: updated, licenseKey },
@@ -222,6 +233,14 @@ router.post(
         ipAddress: req.ip ?? null,
         userAgent: req.headers["user-agent"] ?? null,
       });
+
+      // Send trial rejection email
+      if (trial.email) {
+        const { subject, html } = trialRejectedEmail(trial.fullName, body.reason);
+        sendEmail(trial.email, subject, html).catch(err => {
+          console.error(`[Email] Failed to send to ${trial.email}:`, err.message);
+        });
+      }
 
       res.json({
         success: true,

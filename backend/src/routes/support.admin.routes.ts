@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from "../middleware/auth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { logAudit } from "../lib/audit.js";
 import { paginated } from "../lib/response.js";
+import { parsePagination } from "../lib/pagination.js";
 
 const router = Router();
 
@@ -28,18 +29,28 @@ const updateTicketSchema = z.object({
 
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const { page, pageSize } = parsePagination({ ...req.query, pageSize: req.query.limit } as Record<string, unknown>);
     const skip = (page - 1) * pageSize;
 
     const where: any = {};
 
-    if (req.query.status) where.status = req.query.status;
-    if (req.query.priority) where.priority = req.query.priority;
-    if (req.query.category) where.category = req.query.category;
+    const validStatuses = ["open", "in_progress", "waiting", "resolved", "closed"];
+    if (req.query.status && validStatuses.includes(req.query.status as string)) {
+      where.status = req.query.status as string;
+    }
 
-    if (req.query.search) {
-      const search = req.query.search as string;
+    const validPriorities = ["low", "medium", "high", "critical"];
+    if (req.query.priority && validPriorities.includes(req.query.priority as string)) {
+      where.priority = req.query.priority as string;
+    }
+
+    const validCategories = ["bug", "feature", "question", "other"];
+    if (req.query.category && validCategories.includes(req.query.category as string)) {
+      where.category = req.query.category as string;
+    }
+
+    const search = typeof req.query.search === "string" ? req.query.search.slice(0, 200) : undefined;
+    if (search) {
       where.OR = [
         { ticketNumber: { contains: search } },
         { subject: { contains: search } },

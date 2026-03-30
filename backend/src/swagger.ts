@@ -1,4 +1,9 @@
 import swaggerJsdoc from "swagger-jsdoc";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const options: swaggerJsdoc.Options = {
   definition: {
@@ -15,7 +20,7 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       { url: "http://localhost:3001", description: "Development" },
-      { url: "https://admin.cyberchakra.in", description: "Production" },
+      { url: "https://cyberchakra.online", description: "Production" },
     ],
     components: {
       securitySchemes: {
@@ -46,7 +51,12 @@ const options: swaggerJsdoc.Options = {
       { name: "Desktop App", description: "Public API for CMF desktop application" },
     ],
   },
-  apis: ["./src/routes/*.ts"],
+  // In dev: __dirname = src/, picks up .ts files
+  // In prod: __dirname = dist/, picks up .js files (JSDoc comments preserved since removeComments is not set)
+  apis: [
+    path.resolve(__dirname, "./routes/*.ts"),
+    path.resolve(__dirname, "./routes/*.js"),
+  ],
 };
 
 export const swaggerSpec = swaggerJsdoc(options);

@@ -372,7 +372,7 @@ function MessageBubble({ msg }: { msg: TicketMessage }) {
           ) : isAdmin ? (
             <Headphones className="h-3 w-3" />
           ) : (
-            getInitials(msg.sender || msg.senderName || "U")
+            getInitials(msg.senderName || "U")
           )}
         </AvatarFallback>
       </Avatar>
@@ -396,7 +396,7 @@ function MessageBubble({ msg }: { msg: TicketMessage }) {
           )}
         >
           <span className="text-[11px] font-bold text-[hsl(var(--foreground))]">
-            {msg.sender || msg.senderName || "User"}
+            {msg.senderName}
           </span>
           {isNote && (
             <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-200/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-700 dark:bg-amber-800/40 dark:text-amber-400">
@@ -417,7 +417,7 @@ function MessageBubble({ msg }: { msg: TicketMessage }) {
               : "text-[hsl(var(--foreground)/0.9)]",
           )}
         >
-          {msg.body || msg.message || "(no content)"}
+          {msg.message || "(no content)"}
         </p>
       </div>
     </div>

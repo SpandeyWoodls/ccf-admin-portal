@@ -7,11 +7,11 @@ import { apiGet, apiPost } from "@/lib/api";
 
 export interface TicketMessage {
   id: string;
-  body?: string;
-  message?: string;
+  message: string;       // Primary field (from backend)
+  body?: string;         // Legacy alias
   isInternal: boolean;
-  sender?: string;
-  senderName?: string;
+  senderName: string;    // Primary field (from backend)
+  sender?: string;       // Legacy alias
   senderType: string;
   createdAt: string;
 }
@@ -124,10 +124,14 @@ export const useSupportStore = create<SupportState>()((set, get) => ({
       const raw = await apiGet<any>(
         `/api/v1/admin/tickets/${id}`,
       );
-      // Ensure messages is always an array
+      // Ensure messages is always an array and normalize fields
       const detail: TicketDetail = {
         ...raw,
-        messages: Array.isArray(raw?.messages) ? raw.messages : [],
+        messages: (raw?.messages || []).map((m: any) => ({
+          ...m,
+          message: m.message || m.body || "",
+          senderName: m.senderName || m.sender || "User",
+        })),
       };
       set({ selectedTicket: detail, isLoading: false });
     } catch (err) {
