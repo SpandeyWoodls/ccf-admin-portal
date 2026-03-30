@@ -7,7 +7,7 @@
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:backend": "cd backend && npm run dev",
-    "build": "cd backend && npm install --include=dev && npx prisma generate && npx tsc --skipLibCheck && cd ../frontend && npm install && npm run build",
+    "build": "cd backend && npm install --include=dev && npx prisma generate && npx tsc --skipLibCheck && cd ../frontend && npm install --include=dev && npx vite build",
     "install:all": "cd frontend && npm install && cd ../backend && npm install",
     "start": "cd backend && node dist/index.js",
     "db:push": "cd backend && npx prisma db push",
