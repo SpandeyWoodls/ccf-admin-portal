@@ -37,7 +37,7 @@ async function checkApi(): Promise<CheckResult> {
     const latencyMs = Date.now() - start;
 
     if (res.ok) {
-      const data = await res.json();
+      const data = await res.json() as any;
       return {
         name: 'API',
         status: data.status === 'ok' ? 'pass' : 'fail',
