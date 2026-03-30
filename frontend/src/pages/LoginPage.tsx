@@ -8,8 +8,6 @@ import {
   Eye,
   EyeOff,
   WifiOff,
-  Shield,
-  Search,
   Lock,
   User,
   ArrowRight,
@@ -65,58 +63,50 @@ export function LoginPage() {
       {/* ── Left Panel: Branding ── */}
       <div className="hidden lg:flex lg:w-[55%] flex-col justify-center px-16 xl:px-24 relative overflow-hidden">
         {/* Subtle background circles */}
-        <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-blue-100/40 blur-3xl" />
-        <div className="absolute -bottom-40 -right-20 w-80 h-80 rounded-full bg-blue-50/60 blur-3xl" />
+        {/* Binary code background pattern */}
+        <div className="absolute inset-0 overflow-hidden select-none pointer-events-none">
+          <div className="absolute inset-0 text-blue-200/20 text-xs font-mono leading-6 break-all p-8" style={{ wordSpacing: '0.5em' }}>
+            {Array.from({ length: 40 }, (_, i) => (
+              <div key={i} className="whitespace-nowrap overflow-hidden">
+                {Array.from({ length: 60 }, () => Math.random() > 0.5 ? '1' : '0').join(' ')}
+              </div>
+            ))}
+          </div>
+        </div>
 
-        <div className="relative z-10">
-          {/* Logo */}
-          <div className="flex items-center gap-4 mb-12">
-            <img
-              src="/logo.png"
-              alt="Cyber Chakra"
-              className="h-16 w-16 rounded-full object-contain"
-            />
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 tracking-tight">
-                Cyber Chakra
-              </h2>
-              <p className="text-xs font-semibold tracking-[0.25em] text-blue-600 uppercase">
-                Digital Forensics
-              </p>
+        {/* Subtle blurs */}
+        <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-blue-100/30 blur-3xl" />
+        <div className="absolute -bottom-40 -right-20 w-80 h-80 rounded-full bg-blue-50/40 blur-3xl" />
+
+        {/* Centered content */}
+        <div className="relative z-10 flex flex-col items-center text-center">
+          {/* Big wolf logo */}
+          <div className="mb-10">
+            <div className="relative">
+              <div className="w-64 h-64 xl:w-80 xl:h-80 rounded-full bg-gradient-to-b from-slate-700 to-slate-900 shadow-2xl shadow-blue-900/20 flex items-center justify-center p-2">
+                <img
+                  src="/logo.png"
+                  alt="Cyber Chakra"
+                  className="w-full h-full rounded-full object-contain"
+                />
+              </div>
+              {/* Glow ring */}
+              <div className="absolute inset-0 rounded-full border-2 border-blue-400/20 animate-pulse" />
             </div>
           </div>
 
-          {/* Hero text */}
-          <h1 className="text-5xl xl:text-6xl font-bold leading-[1.1] text-gray-900 mb-6">
-            License &
-            <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-blue-600">
-              Distribution
-            </span>
-            <br />
-            Portal
-          </h1>
+          {/* Accent line */}
+          <div className="w-12 h-1 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-full mb-6" />
 
-          <p className="text-gray-500 text-lg mb-10 max-w-lg leading-relaxed">
-            Centralized management for licenses, customers, software releases,
-            and real-time usage analytics.
+          {/* Tagline */}
+          <h2 className="text-2xl xl:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-blue-500 mb-4">
+            Data Security is Our Supreme Duty
+          </h2>
+
+          <p className="text-gray-400 text-sm max-w-sm leading-relaxed">
+            Protecting India's digital infrastructure with indigenous,
+            AI-powered forensic solutions
           </p>
-
-          {/* Feature bullets */}
-          <div className="space-y-5">
-            <FeatureBullet
-              icon={<Shield className="h-4 w-4" />}
-              text="Manage licenses, activations, and customer organizations"
-            />
-            <FeatureBullet
-              icon={<Search className="h-4 w-4" />}
-              text="Track usage analytics, heartbeats, and version adoption"
-            />
-            <FeatureBullet
-              icon={<Lock className="h-4 w-4" />}
-              text="Secure software distribution with staged rollouts"
-            />
-          </div>
         </div>
       </div>
 
@@ -269,14 +259,3 @@ export function LoginPage() {
   );
 }
 
-/* ── Feature bullet component ── */
-function FeatureBullet({ icon, text }: { icon: React.ReactNode; text: string }) {
-  return (
-    <div className="flex items-center gap-4">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
-        {icon}
-      </div>
-      <p className="text-gray-500 text-sm">{text}</p>
-    </div>
-  );
-}
