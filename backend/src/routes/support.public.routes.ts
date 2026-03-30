@@ -12,17 +12,22 @@ const router = Router();
 
 const createTicketSchema = z.object({
   license_key: z.string().min(1),
+  hardware_fingerprint: z.string().optional(),
   subject: z.string().min(1).max(512),
-  message: z.string().min(1),
-  category: z.enum(["bug", "feature", "question", "other"]).default("other"),
-  priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
-  sender_name: z.string().min(1).max(255),
+  message: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
+  category: z.enum(["bug", "feature", "question", "other", "technical", "billing", "license"]).default("other"),
+  priority: z.enum(["low", "medium", "high", "critical", "urgent"]).default("medium"),
+  sender_name: z.string().min(1).max(255).optional(),
   sender_email: z.string().email().optional(),
+  app_version: z.string().optional(),
+  system_info: z.string().optional(),
 });
 
 const ticketStatusSchema = z.object({
-  ticket_number: z.string().min(1),
   license_key: z.string().min(1),
+  hardware_fingerprint: z.string().optional(),
+  ticket_number: z.string().optional(),
 });
 
 const ticketDetailsSchema = z.object({
@@ -64,6 +69,10 @@ router.post("/create-ticket", async (req: Request, res: Response, next: NextFunc
     }
 
     const ticketNumber = generateTicketNumber();
+    const messageText = body.message || body.description || body.subject;
+    const senderName = body.sender_name || "User";
+    const priority = body.priority === "urgent" ? "critical" : body.priority;
+    const category = (body.category === "technical" || body.category === "billing" || body.category === "license") ? "other" : body.category;
 
     const ticket = await prisma.supportTicket.create({
       data: {
@@ -71,14 +80,14 @@ router.post("/create-ticket", async (req: Request, res: Response, next: NextFunc
         licenseKey: body.license_key,
         organizationId: license.organizationId,
         subject: body.subject,
-        category: body.category,
-        priority: body.priority,
+        category: category as any,
+        priority: priority as any,
         status: "open",
         messages: {
           create: {
-            message: body.message,
+            message: messageText,
             senderType: "user",
-            senderName: body.sender_name,
+            senderName: senderName,
           },
         },
       },
@@ -101,33 +110,63 @@ router.post("/create-ticket", async (req: Request, res: Response, next: NextFunc
 router.post("/ticket-status", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = ticketStatusSchema.parse(req.body);
+    const portalBaseUrl = process.env.PORTAL_URL || "https://cyberchakra.online";
 
-    const ticket = await prisma.supportTicket.findUnique({
-      where: { ticketNumber: body.ticket_number },
-    });
+    // If ticket_number provided, return that specific ticket
+    if (body.ticket_number) {
+      const ticket = await prisma.supportTicket.findUnique({
+        where: { ticketNumber: body.ticket_number },
+      });
 
-    if (!ticket || ticket.licenseKey !== body.license_key) {
-      res.status(404).json(
-        desktopResponse(false, null, "TICKET_NOT_FOUND", "Ticket not found or license key mismatch"),
-      );
+      if (!ticket || ticket.licenseKey !== body.license_key) {
+        res.status(404).json(
+          desktopResponse(false, null, "TICKET_NOT_FOUND", "Ticket not found"),
+        );
+        return;
+      }
+
+      res.json(desktopResponse(true, {
+        open_tickets: 1,
+        unread_replies: 0,
+        tickets: [{
+          ticket_number: ticket.ticketNumber,
+          subject: ticket.subject,
+          status: ticket.status,
+          priority: ticket.priority,
+          category: ticket.category,
+          has_new_reply: false,
+          last_updated: ticket.updatedAt.toISOString(),
+          portal_url: `${portalBaseUrl}/support`,
+        }],
+        portal_url: `${portalBaseUrl}/support`,
+      }, null, ""));
       return;
     }
 
-    const portalBaseUrl = process.env.PORTAL_URL || "https://admin.cyberchakra.in";
+    // Otherwise list all tickets for this license
+    const tickets = await prisma.supportTicket.findMany({
+      where: { licenseKey: body.license_key },
+      orderBy: { updatedAt: "desc" },
+      take: 50,
+    });
 
-    res.json(
-      desktopResponse(true, {
-        ticket_number: ticket.ticketNumber,
-        subject: ticket.subject,
-        status: ticket.status,
-        priority: ticket.priority,
-        category: ticket.category,
-        created_at: ticket.createdAt.toISOString(),
-        updated_at: ticket.updatedAt.toISOString(),
-        closed_at: ticket.closedAt?.toISOString() ?? null,
-        portal_url: `${portalBaseUrl}/support/tickets/${ticket.ticketNumber}`,
-      }, null, ""),
-    );
+    const openCount = tickets.filter(t => t.status === "open" || t.status === "in_progress").length;
+
+    res.json(desktopResponse(true, {
+      open_tickets: openCount,
+      unread_replies: 0,
+      tickets: tickets.map(t => ({
+        ticket_number: t.ticketNumber,
+        subject: t.subject,
+        status: t.status,
+        priority: t.priority,
+        category: t.category,
+        has_new_reply: false,
+        last_updated: t.updatedAt.toISOString(),
+        portal_url: `${portalBaseUrl}/support`,
+      })),
+      portal_url: `${portalBaseUrl}/support`,
+    }, null, ""));
   } catch (err) {
     next(err);
   }
