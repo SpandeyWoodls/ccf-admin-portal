@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet, apiPost, apiDelete, apiPatch } from "@/lib/api";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -67,6 +67,9 @@ interface ReleaseState {
   createRelease: (data: Record<string, unknown>) => Promise<Release>;
   publishRelease: (id: string) => Promise<void>;
   blockRelease: (id: string, reason: string) => Promise<void>;
+  deleteRelease: (id: string) => Promise<void>;
+  updateRelease: (id: string, data: Record<string, unknown>) => Promise<void>;
+  importAssets: (releaseId: string) => Promise<void>;
   clearSelectedRelease: () => void;
   reset: () => void;
 }
@@ -190,6 +193,50 @@ export const useReleaseStore = create<ReleaseState>()((set, get) => ({
       ),
       isLoading: false,
     }));
+  },
+
+  deleteRelease: async (id: string) => {
+    try {
+      await apiDelete(`/api/v1/admin/releases/${id}`);
+      set((state) => ({
+        releases: state.releases.filter((r) => r.id !== id),
+      }));
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : "Failed to delete release",
+      });
+      throw err;
+    }
+  },
+
+  updateRelease: async (id: string, data: Record<string, unknown>) => {
+    try {
+      const updated = await apiPatch<Release>(
+        `/api/v1/admin/releases/${id}`,
+        data,
+      );
+      set((state) => ({
+        releases: state.releases.map((r) => (r.id === id ? { ...r, ...updated } : r)),
+      }));
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : "Failed to update release",
+      });
+      throw err;
+    }
+  },
+
+  importAssets: async (releaseId: string) => {
+    try {
+      await apiPost(`/api/v1/admin/release-wizard/import-assets`, {
+        releaseId,
+      });
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : "Failed to import assets",
+      });
+      throw err;
+    }
   },
 
   clearSelectedRelease: () => set({ selectedRelease: null }),

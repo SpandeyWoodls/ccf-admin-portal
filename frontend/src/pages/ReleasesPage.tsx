@@ -22,6 +22,11 @@ import {
   Clock,
   Search,
   Tag,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Loader2,
+  Github,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +50,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   useReleaseStore,
@@ -563,10 +582,18 @@ function ReleaseCard({
   release,
   onPublish,
   onBlock,
+  onDelete,
+  onEdit,
+  onImportAssets,
+  isImporting,
 }: {
   release: PageRelease;
   onPublish: (id: string) => void;
   onBlock: (id: string) => void;
+  onDelete: (id: string) => void;
+  onEdit: (release: PageRelease) => void;
+  onImportAssets: (id: string) => void;
+  isImporting: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const status = getReleaseStatus(release);
@@ -629,16 +656,62 @@ function ReleaseCard({
                 {release.title}
               </p>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span
-                className={cn(
-                  "inline-block h-2 w-2 rounded-full",
-                  statusCfg.dotColor
-                )}
-              />
-              <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">
-                {statusCfg.label}
-              </span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={cn(
+                    "inline-block h-2 w-2 rounded-full",
+                    statusCfg.dotColor
+                  )}
+                />
+                <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">
+                  {statusCfg.label}
+                </span>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                    <MoreHorizontal className="h-4 w-4" />
+                    <span className="sr-only">Actions</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onEdit(release)}>
+                    <Pencil className="mr-2 h-3.5 w-3.5" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onImportAssets(release.id)}
+                    disabled={isImporting}
+                  >
+                    {isImporting ? (
+                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Github className="mr-2 h-3.5 w-3.5" />
+                    )}
+                    Import from GitHub
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {status === "published" && (
+                    <DropdownMenuItem
+                      className="text-[hsl(var(--destructive))]"
+                      onClick={() => onBlock(release.id)}
+                    >
+                      <ShieldBan className="mr-2 h-3.5 w-3.5" />
+                      Block Version
+                    </DropdownMenuItem>
+                  )}
+                  {status === "draft" && (
+                    <DropdownMenuItem
+                      className="text-[hsl(var(--destructive))]"
+                      onClick={() => onDelete(release.id)}
+                    >
+                      <Trash2 className="mr-2 h-3.5 w-3.5" />
+                      Delete
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
@@ -701,10 +774,27 @@ function ReleaseCard({
             <div className="flex items-center gap-2">
               <RoleGuard permission="releases.publish">
                 {status === "draft" && (
-                  <Button size="sm" onClick={() => onPublish(release.id)}>
-                    <Rocket className="h-3.5 w-3.5" />
-                    Publish
-                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span tabIndex={0}>
+                          <Button
+                            size="sm"
+                            disabled={!release.assets || release.assets.length === 0}
+                            onClick={() => onPublish(release.id)}
+                          >
+                            <Rocket className="h-3.5 w-3.5" />
+                            Publish
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {(!release.assets || release.assets.length === 0) && (
+                        <TooltipContent>
+                          <p>Import assets before publishing</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
               </RoleGuard>
               <RoleGuard permission="releases.block">
@@ -755,7 +845,32 @@ function ReleaseCard({
                   Distribution Assets
                 </h4>
                 <div className="rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
-                  <AssetsTable assets={release.assets} />
+                  {release.assets.length === 0 ? (
+                    <div className="text-center py-6">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--muted)/0.7)] mx-auto">
+                        <Package className="h-6 w-6 text-[hsl(var(--muted-foreground)/0.6)]" />
+                      </div>
+                      <p className="text-sm text-[hsl(var(--muted-foreground))] mt-3">No assets yet</p>
+                      <p className="text-xs text-[hsl(var(--muted-foreground)/0.5)] mt-1 mb-3">
+                        Import platform installers from your GitHub release
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onImportAssets(release.id)}
+                        disabled={isImporting}
+                      >
+                        {isImporting ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Download className="h-4 w-4 mr-2" />
+                        )}
+                        Import from GitHub
+                      </Button>
+                    </div>
+                  ) : (
+                    <AssetsTable assets={release.assets} />
+                  )}
                 </div>
               </div>
 
@@ -1025,6 +1140,184 @@ function CreateReleaseDialog({
 }
 
 // ---------------------------------------------------------------------------
+// Edit Release Dialog
+// ---------------------------------------------------------------------------
+
+const editReleaseSchema = z.object({
+  title: z.string().min(1, "Title is required").max(200, "Title too long"),
+  channel: z.enum(["stable", "beta", "rc"], {
+    required_error: "Channel is required",
+  }),
+  severity: z.enum(["critical", "recommended", "optional"], {
+    required_error: "Severity is required",
+  }),
+  releaseNotes: z.string().optional(),
+});
+
+type EditReleaseForm = z.infer<typeof editReleaseSchema>;
+
+function EditReleaseDialog({
+  open,
+  onOpenChange,
+  onSave,
+  release,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (data: EditReleaseForm) => void;
+  release: PageRelease;
+}) {
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors, isValid },
+  } = useForm<EditReleaseForm>({
+    resolver: zodResolver(editReleaseSchema),
+    mode: "onChange",
+    defaultValues: {
+      title: release.title,
+      channel: release.channel as "stable" | "beta" | "rc",
+      severity: release.severity as "critical" | "recommended" | "optional",
+      releaseNotes: release.releaseNotes || "",
+    },
+  });
+
+  const onSubmit = (data: EditReleaseForm) => {
+    onSave(data);
+    reset();
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) reset();
+        onOpenChange(v);
+      }}
+    >
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Release v{release.version}</DialogTitle>
+          <DialogDescription>
+            Update release details. Version cannot be changed after creation.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* Title */}
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-title">
+              Title <span className="text-[hsl(var(--destructive))]">*</span>
+            </Label>
+            <Input
+              id="edit-title"
+              placeholder="Security Patch - CVE-2026-XXXX"
+              {...register("title")}
+            />
+            {errors.title && (
+              <p className="text-xs text-[hsl(var(--destructive))]">
+                {errors.title.message}
+              </p>
+            )}
+          </div>
+
+          {/* Channel & Severity Row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>
+                Channel <span className="text-[hsl(var(--destructive))]">*</span>
+              </Label>
+              <Controller
+                name="channel"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select channel" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="stable">Stable</SelectItem>
+                      <SelectItem value="beta">Beta</SelectItem>
+                      <SelectItem value="rc">Release Candidate</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.channel && (
+                <p className="text-xs text-[hsl(var(--destructive))]">
+                  {errors.channel.message}
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>
+                Severity{" "}
+                <span className="text-[hsl(var(--destructive))]">*</span>
+              </Label>
+              <Controller
+                name="severity"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select severity" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="critical">Critical</SelectItem>
+                      <SelectItem value="recommended">Recommended</SelectItem>
+                      <SelectItem value="optional">Optional</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.severity && (
+                <p className="text-xs text-[hsl(var(--destructive))]">
+                  {errors.severity.message}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Release Notes */}
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-releaseNotes">Release Notes</Label>
+            <Textarea
+              id="edit-releaseNotes"
+              placeholder="## What's New&#10;- Feature description"
+              rows={6}
+              {...register("releaseNotes")}
+            />
+            <p className="text-[10px] text-[hsl(var(--muted-foreground))]">
+              Supports markdown formatting
+            </p>
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                reset();
+                onOpenChange(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!isValid}>
+              <Pencil className="h-4 w-4" />
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
 
@@ -1037,13 +1330,18 @@ export function ReleasesPage() {
     createRelease,
     publishRelease,
     blockRelease,
+    deleteRelease,
+    updateRelease,
+    importAssets,
   } = useReleaseStore();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [blockTarget, setBlockTarget] = useState<PageRelease | null>(null);
+  const [editTarget, setEditTarget] = useState<PageRelease | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [channelFilter, setChannelFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [isImporting, setIsImporting] = useState(false);
 
   // Fetch releases on mount
   useEffect(() => {
@@ -1109,11 +1407,56 @@ export function ReleasesPage() {
   };
 
   const handlePublish = async (id: string) => {
-    await publishRelease(id);
+    try {
+      await publishRelease(id);
+      toast.success("Release published!");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to publish";
+      if (msg.includes("without assets")) {
+        toast.error("Import assets from GitHub before publishing");
+      } else {
+        toast.error(msg);
+      }
+    }
   };
 
   const handleBlock = async (id: string, reason: string) => {
     await blockRelease(id, reason);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this draft release? This cannot be undone.")) return;
+    try {
+      await deleteRelease(id);
+      toast.success("Release deleted");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete");
+    }
+  };
+
+  const handleImportAssets = async (releaseId: string) => {
+    setIsImporting(true);
+    try {
+      await importAssets(releaseId);
+      toast.success("Assets imported from GitHub");
+      fetchReleases();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to import assets");
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleEdit = async (data: EditReleaseForm) => {
+    if (!editTarget) return;
+    try {
+      await updateRelease(editTarget.id, data);
+      toast.success("Release updated");
+      setEditTarget(null);
+      fetchReleases();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update release");
+    }
   };
 
   if (isLoading && releases.length === 0) {
@@ -1251,6 +1594,10 @@ export function ReleasesPage() {
                 const target = releases.find((r) => r.id === id);
                 if (target) setBlockTarget(target);
               }}
+              onDelete={handleDelete}
+              onEdit={(r) => setEditTarget(r)}
+              onImportAssets={handleImportAssets}
+              isImporting={isImporting}
             />
           ))}
         </div>
@@ -1282,6 +1629,18 @@ export function ReleasesPage() {
             setBlockTarget(null);
           }}
           version={blockTarget.version}
+        />
+      )}
+
+      {/* Edit Release Dialog */}
+      {editTarget && (
+        <EditReleaseDialog
+          open={!!editTarget}
+          onOpenChange={(open) => {
+            if (!open) setEditTarget(null);
+          }}
+          onSave={handleEdit}
+          release={editTarget}
         />
       )}
     </div>
