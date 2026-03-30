@@ -304,4 +304,51 @@ router.post(
   },
 );
 
+// ─── DELETE /:id (delete draft release) ────────────────────────────────────
+
+router.delete(
+  "/:id",
+  requireRole("admin", "super_admin"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+
+      const release = await prisma.release.findUnique({
+        where: { id },
+        include: { assets: true, rolloutPolicy: true },
+      });
+
+      if (!release) {
+        throw new AppError(404, "Release not found", "NOT_FOUND");
+      }
+
+      if (release.publishedAt) {
+        throw new AppError(400, "Cannot delete a published release. Block it instead.", "CANNOT_DELETE_PUBLISHED");
+      }
+
+      // Delete in order: stages -> policy -> assets -> release
+      if (release.rolloutPolicy) {
+        await prisma.rolloutStage.deleteMany({ where: { rolloutId: release.rolloutPolicy.id } });
+        await prisma.rolloutPolicy.delete({ where: { id: release.rolloutPolicy.id } });
+      }
+      await prisma.releaseAsset.deleteMany({ where: { releaseId: id } });
+      await prisma.release.delete({ where: { id } });
+
+      await logAudit({
+        adminUserId: req.admin!.id,
+        action: "release_deleted",
+        resourceType: "Release",
+        resourceId: id,
+        oldValues: { version: release.version, channel: release.channel },
+        ipAddress: req.ip ?? null,
+        userAgent: req.headers["user-agent"] ?? null,
+      });
+
+      res.json({ success: true, data: null, error: null, message: "Release deleted" });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 export default router;
