@@ -9,7 +9,7 @@ import { paginated } from "../lib/response.js";
 import { parsePagination } from "../lib/pagination.js";
 import { addDays, addMonths, addYears } from "date-fns";
 import { sendEmail } from "../services/email.js";
-import { licenseRevokedEmail } from "../services/email-templates.js";
+import { licenseRevokedEmail, welcomeEmail, licenseSuspendedEmail } from "../services/email-templates.js";
 
 const router = Router();
 
@@ -341,6 +341,23 @@ router.post(
         ipAddress: req.ip ?? null,
         userAgent: req.headers["user-agent"] ?? null,
       });
+
+      // Fire-and-forget: notify organization about new license
+      if (license.organization) {
+        prisma.organization
+          .findUnique({ where: { id: license.organization.id }, select: { name: true, email: true } })
+          .then((org) => {
+            if (org?.email) {
+              const { subject, html } = welcomeEmail(org.name, org.name);
+              sendEmail(org.email, subject, html).catch(err => {
+                console.error(`[Email] License created notification failed:`, err.message);
+              });
+            }
+          })
+          .catch(err => {
+            console.error(`[Email] Failed to fetch org for license creation notification:`, err.message);
+          });
+      }
 
       res.status(201).json({ success: true, data: license, error: null, message: "License created" });
     } catch (err) {

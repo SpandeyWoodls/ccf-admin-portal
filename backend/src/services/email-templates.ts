@@ -215,6 +215,97 @@ export function ticketReplyEmail(
   return { subject, html };
 }
 
+// ─── License Activated Alert (Admin) ───────────────────────────────────────
+
+export function licenseActivatedAlertEmail(
+  licenseKey: string,
+  machineName: string,
+  osInfo: string,
+): { subject: string; html: string } {
+  const subject = `License Activated: ${licenseKey.substring(0, 12)}...`;
+  const html = wrapTemplate(`
+    <h2 style="color: #34d399; font-size: 18px; margin: 0 0 12px 0;">License Activated</h2>
+    <p style="color: #9ca3af; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">
+      A license has just been activated on a new machine.
+    </p>
+    ${infoBox("License Key", licenseKey)}
+    ${infoBox("Machine Name", machineName)}
+    ${infoBox("Operating System", osInfo)}
+    <p style="color: #9ca3af; font-size: 13px; line-height: 1.5; margin: 16px 0 0 0;">
+      This is an automated notification. No action is required unless this activation is unexpected.
+    </p>
+    ${ctaButton("View Licenses", `${getPortalUrl()}/licenses`)}
+  `);
+  return { subject, html };
+}
+
+// ─── License Suspended Notification ────────────────────────────────────────
+
+export function licenseSuspendedEmail(
+  orgName: string,
+  licenseKey: string,
+  reason: string | null,
+): { subject: string; html: string } {
+  const subject = `License Suspended: ${licenseKey.substring(0, 12)}...`;
+  const html = wrapTemplate(`
+    <h2 style="color: #f59e0b; font-size: 18px; margin: 0 0 12px 0;">License Suspended</h2>
+    <p style="color: #9ca3af; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">
+      A license associated with <strong style="color: #e4e7ec;">${orgName}</strong> has been suspended. Active installations using this license may be unable to perform forensic operations until the suspension is lifted.
+    </p>
+    ${infoBox("License Key", licenseKey)}
+    ${reason ? infoBox("Reason", reason) : ""}
+    <p style="color: #9ca3af; font-size: 13px; line-height: 1.5; margin: 16px 0 0 0;">
+      If you believe this was in error, please contact the CCF administration team for assistance.
+    </p>
+    ${ctaButton("Contact Support", `mailto:support@cyberchakra.in`)}
+  `);
+  return { subject, html };
+}
+
+// ─── Ticket Confirmation (User) ────────────────────────────────────────────
+
+export function ticketConfirmationEmail(
+  ticketNumber: string,
+  subject: string,
+): { subject: string; html: string } {
+  const emailSubject = `Support Ticket Created: ${ticketNumber}`;
+  const html = wrapTemplate(`
+    <h2 style="color: #e4e7ec; font-size: 18px; margin: 0 0 12px 0;">Ticket Created</h2>
+    <p style="color: #9ca3af; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">
+      Your support ticket has been created successfully. Our team will review it and respond as soon as possible.
+    </p>
+    ${infoBox("Ticket Number", ticketNumber)}
+    ${infoBox("Subject", subject)}
+    <p style="color: #9ca3af; font-size: 13px; line-height: 1.5; margin: 16px 0 0 0;">
+      You can check the status of your ticket and view replies from within the CCF desktop application.
+    </p>
+  `);
+  return { subject: emailSubject, html };
+}
+
+// ─── Ticket Reply Notification (User) ──────────────────────────────────────
+
+export function ticketReplyNotificationEmail(
+  ticketNumber: string,
+  replyPreview: string,
+): { subject: string; html: string } {
+  const subject = `New Reply on Ticket ${ticketNumber}`;
+  const html = wrapTemplate(`
+    <h2 style="color: #e4e7ec; font-size: 18px; margin: 0 0 12px 0;">You Have a New Reply</h2>
+    <p style="color: #9ca3af; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">
+      The support team has replied to your ticket <strong style="color: #4d8ce8;">${ticketNumber}</strong>.
+    </p>
+    <div style="background: #161a24; border-left: 3px solid #4d8ce8; border-radius: 0 6px 6px 0; padding: 16px; margin: 16px 0;">
+      <span style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Reply Preview</span>
+      <div style="color: #e4e7ec; font-size: 14px; line-height: 1.6; margin-top: 8px; white-space: pre-line;">${replyPreview.length > 300 ? replyPreview.substring(0, 300) + "..." : replyPreview}</div>
+    </div>
+    <p style="color: #9ca3af; font-size: 13px; line-height: 1.5; margin: 16px 0 0 0;">
+      Open the CCF desktop application to view the full reply and respond.
+    </p>
+  `);
+  return { subject, html };
+}
+
 // ─── License Revoked Notification ──────────────────────────────────────────
 
 export function licenseRevokedEmail(
