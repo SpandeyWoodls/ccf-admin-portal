@@ -1,4 +1,5 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+dotenv.config({ path: ".env" }); // Silently ignored if .env doesn't exist
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
