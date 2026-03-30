@@ -972,10 +972,10 @@ export function DownloadsPage() {
               className="h-10 w-10 shrink-0 rounded-xl object-contain bg-[hsl(var(--muted)/0.5)] p-1"
             />
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))]">
+              <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--foreground))]">
                 Software Distribution
               </h1>
-              <p className="text-sm text-[hsl(var(--muted-foreground))]">
+              <p className="mt-0.5 text-sm text-[hsl(var(--muted-foreground))]">
                 {loading
                   ? "Loading releases..."
                   : releases.length === 0

@@ -13,7 +13,6 @@ import {
   Monitor,
   User,
   Building2,
-  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -491,10 +490,10 @@ export function TrialsPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))]">
+          <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--foreground))]">
             Trial Requests
           </h1>
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">
+          <p className="mt-0.5 text-sm text-[hsl(var(--muted-foreground))]">
             Review and manage incoming trial license requests.
           </p>
         </div>
@@ -508,10 +507,10 @@ export function TrialsPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))]">
+          <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--foreground))]">
             Trial Requests
           </h1>
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">
+          <p className="mt-0.5 text-sm text-[hsl(var(--muted-foreground))]">
             Review and manage incoming trial license requests.
           </p>
         </div>
@@ -558,10 +557,10 @@ export function TrialsPage() {
       {/* Header + filter tabs */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))]">
+          <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--foreground))]">
             Trial Requests
           </h1>
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">
+          <p className="mt-0.5 text-sm text-[hsl(var(--muted-foreground))]">
             Review and manage incoming trial license requests.
           </p>
         </div>

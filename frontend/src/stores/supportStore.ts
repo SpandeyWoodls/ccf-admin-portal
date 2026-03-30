@@ -7,9 +7,11 @@ import { apiGet, apiPost } from "@/lib/api";
 
 export interface TicketMessage {
   id: string;
-  body: string;
+  body?: string;
+  message?: string;
   isInternal: boolean;
-  sender: string;
+  sender?: string;
+  senderName?: string;
   senderType: string;
   createdAt: string;
 }

@@ -865,10 +865,10 @@ export function SettingsPage() {
     <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))]">
+        <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--foreground))]">
           Settings
         </h1>
-        <p className="text-sm text-[hsl(var(--muted-foreground))]">
+        <p className="mt-0.5 text-sm text-[hsl(var(--muted-foreground))]">
           Manage your account, security, team, and system configuration.
         </p>
       </div>

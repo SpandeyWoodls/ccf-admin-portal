@@ -372,7 +372,7 @@ function MessageBubble({ msg }: { msg: TicketMessage }) {
           ) : isAdmin ? (
             <Headphones className="h-3 w-3" />
           ) : (
-            getInitials(msg.sender || "U")
+            getInitials(msg.sender || msg.senderName || "U")
           )}
         </AvatarFallback>
       </Avatar>
@@ -396,7 +396,7 @@ function MessageBubble({ msg }: { msg: TicketMessage }) {
           )}
         >
           <span className="text-[11px] font-bold text-[hsl(var(--foreground))]">
-            {msg.sender}
+            {msg.sender || msg.senderName || "User"}
           </span>
           {isNote && (
             <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-200/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-700 dark:bg-amber-800/40 dark:text-amber-400">
@@ -417,7 +417,7 @@ function MessageBubble({ msg }: { msg: TicketMessage }) {
               : "text-[hsl(var(--foreground)/0.9)]",
           )}
         >
-          {msg.body}
+          {msg.body || msg.message || "(no content)"}
         </p>
       </div>
     </div>
@@ -541,39 +541,27 @@ export function SupportPage() {
   const hasNoTickets = !initialLoad && safeTickets.length === 0;
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))]">
-          Support Tickets
+    <div className="space-y-3">
+      {/* Compact header: title + stats + tabs in tight rows */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--foreground))]">
+          Support
         </h1>
-        <p className="text-sm text-[hsl(var(--muted-foreground))]">
-          Manage support tickets submitted from the desktop application.
-        </p>
-      </div>
-
-      {/* Stats Pills -- compact inline indicators */}
-      <div className="flex items-center gap-3">
-        {showGlobalSkeleton ? (
-          <Skeleton className="h-7 w-64 rounded-full" />
-        ) : (
-          <div className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-4 py-1.5 text-xs font-medium text-[hsl(var(--foreground))]">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-[hsl(var(--primary))]" />
-              <span className="text-[hsl(var(--muted-foreground))]">Open:</span>
-              <span className="font-semibold">{openCount}</span>
+        {!showGlobalSkeleton && (
+          <div className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-1 text-[11px] font-medium text-[hsl(var(--foreground))]">
+            <span className="inline-flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))]" />
+              <span>{openCount}</span>
             </span>
-            <span className="mx-2 text-[hsl(var(--border))]">|</span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-[hsl(var(--warning))]" />
-              <span className="text-[hsl(var(--muted-foreground))]">In Progress:</span>
-              <span className="font-semibold">{inProgressCount}</span>
+            <span className="mx-1.5 text-[hsl(var(--border))]">|</span>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--warning))]" />
+              <span>{inProgressCount}</span>
             </span>
-            <span className="mx-2 text-[hsl(var(--border))]">|</span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-[hsl(var(--muted-foreground))]" />
-              <span className="text-[hsl(var(--muted-foreground))]">Awaiting Reply:</span>
-              <span className="font-semibold">{waitingCount}</span>
+            <span className="mx-1.5 text-[hsl(var(--border))]">|</span>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--muted-foreground))]" />
+              <span>{waitingCount}</span>
             </span>
           </div>
         )}
@@ -606,7 +594,7 @@ export function SupportPage() {
       {hasNoTickets ? (
         <Card
           className="flex items-center justify-center"
-          style={{ height: "calc(100vh - 300px)", minHeight: "450px" }}
+          style={{ height: "calc(100vh - 200px)", minHeight: "450px" }}
         >
           <NoTicketsState />
         </Card>
