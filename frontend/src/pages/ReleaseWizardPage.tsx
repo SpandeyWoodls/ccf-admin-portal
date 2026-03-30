@@ -55,8 +55,8 @@ interface BuildTarget {
 interface BuildStatusResponse {
   id: string;
   status: "queued" | "building" | "success" | "failed" | "cancelled";
-  targets: BuildTarget[];
-  logs: string[];
+  targets?: BuildTarget[];
+  logs?: string[];
   startedAt?: string;
   completedAt?: string;
 }
@@ -616,7 +616,7 @@ function StepBuild({
     timerRef.current = setInterval(() => {
       setElapsedTimers((prev) => {
         const next: Record<string, number> = { ...prev };
-        for (const t of buildStatus.targets) {
+        for (const t of (buildStatus.targets || [])) {
           if (t.status === "building") {
             next[`${t.platform}-${t.arch}`] = (prev[`${t.platform}-${t.arch}`] ?? t.elapsed) + 1;
           }
