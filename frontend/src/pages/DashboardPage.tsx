@@ -68,6 +68,23 @@ interface ActivityDisplay {
 
 function mapActionToDisplay(raw: DashboardStats["recentActivity"][number]): ActivityDisplay {
   const actionMap: Record<string, { icon: typeof CheckCircle2; iconColor: string; label: string }> = {
+    // Actions from the backend (no prefix -- stored as-is in license_events)
+    "activated": {
+      icon: CheckCircle2,
+      iconColor: "text-[hsl(var(--success))]",
+      label: "License activated",
+    },
+    "deactivated": {
+      icon: XCircle,
+      iconColor: "text-[hsl(var(--destructive))]",
+      label: "License deactivated",
+    },
+    "force.deactivated": {
+      icon: XCircle,
+      iconColor: "text-[hsl(var(--destructive))]",
+      label: "License force-deactivated",
+    },
+    // Actions with "license." prefix (from underscore-to-dot transform)
     "license.activated": {
       icon: CheckCircle2,
       iconColor: "text-[hsl(var(--success))]",

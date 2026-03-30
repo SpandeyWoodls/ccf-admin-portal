@@ -65,7 +65,7 @@ interface ReleaseState {
   fetchReleases: () => Promise<void>;
   fetchRelease: (id: string) => Promise<void>;
   createRelease: (data: Record<string, unknown>) => Promise<Release>;
-  publishRelease: (id: string) => Promise<void>;
+  publishRelease: (id: string, force?: boolean) => Promise<void>;
   blockRelease: (id: string, reason: string) => Promise<void>;
   deleteRelease: (id: string) => Promise<void>;
   updateRelease: (id: string, data: Record<string, unknown>) => Promise<void>;
@@ -138,17 +138,18 @@ export const useReleaseStore = create<ReleaseState>()((set, get) => ({
     }
   },
 
-  publishRelease: async (id: string) => {
+  publishRelease: async (id: string, force = false) => {
     set({ isLoading: true, error: null });
     try {
-      await apiPost<void>(`/api/v1/admin/releases/${id}/publish`);
+      const qs = force ? "?force=true" : "";
+      await apiPost<void>(`/api/v1/admin/releases/${id}/publish${qs}`);
     } catch (err) {
       console.error("Failed to publish release:", err);
       set({
         isLoading: false,
         error: err instanceof Error ? err.message : "Failed to publish release",
       });
-      return;
+      throw err;
     }
     const now = new Date().toISOString();
     const { selectedRelease } = get();

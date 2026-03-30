@@ -222,8 +222,18 @@ router.post(
       if (!existing) throw new AppError(404, "Release not found", "NOT_FOUND");
       if (existing.publishedAt) throw new AppError(400, "Release is already published", "ALREADY_PUBLISHED");
       if (existing.isBlocked) throw new AppError(400, "Cannot publish a blocked release", "RELEASE_BLOCKED");
-      if (existing.assets.length === 0) {
-        throw new AppError(400, "Cannot publish a release without assets", "NO_ASSETS");
+
+      // Allow super_admin to force-publish without assets (for testing)
+      const forcePublish = req.query.force === "true";
+      if (existing.assets.length === 0 && !forcePublish) {
+        throw new AppError(
+          400,
+          "No assets uploaded. Use 'Import from GitHub' to pull binaries, or use the Release Wizard to trigger a new build.",
+          "NO_ASSETS",
+        );
+      }
+      if (forcePublish && req.admin!.role !== "super_admin") {
+        throw new AppError(403, "Only super_admin can force-publish without assets", "FORBIDDEN");
       }
 
       const updated = await prisma.release.update({

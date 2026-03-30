@@ -168,11 +168,11 @@ router.post(
             (run: any) => run.event === "workflow_dispatch" && run.created_at >= fiveMinutesAgo,
           );
           if (recentRun) {
-            workflowRunId = recentRun.id;
+            workflowRunId = recentRun.id as number;
             // Persist the run ID to the Release record for future lookups
             await prisma.release.update({
               where: { id: release.id },
-              data: { workflowRunId: BigInt(workflowRunId) },
+              data: { workflowRunId: BigInt(recentRun.id) },
             });
           }
         }
@@ -220,6 +220,8 @@ router.post(
 
 // ─── GET /build-status ─────────────────────────────────────────────────────
 // Fetches the current build status from GitHub Actions for a given release.
+// Returns a shape matching the frontend's BuildStatusResponse interface:
+//   { id, status, targets?, logs?, startedAt?, completedAt? }
 //
 // Query: ?releaseId=xxx or ?workflowRunId=yyy
 
@@ -259,96 +261,215 @@ router.get(
           throw new AppError(404, "Release not found", "NOT_FOUND");
         }
 
-        // If no explicit workflowRunId, try to find a matching workflow run by version
+        // Use the stored workflowRunId if available
+        if (!workflowRunId && release.workflowRunId) {
+          workflowRunId = Number(release.workflowRunId);
+        }
+
+        // If still no workflowRunId, poll GitHub for recent workflow_dispatch runs
         if (!workflowRunId) {
           try {
             const runsResponse = await githubFetch(
               `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs?per_page=10&event=workflow_dispatch`,
             );
 
-            if (runsResponse?.workflow_runs) {
-              // Look for a run whose head_branch or display_title contains the version
-              const matchingRun = runsResponse.workflow_runs.find(
-                (run: any) =>
-                  run.display_title?.includes(release.version) ||
-                  run.name?.includes(release.version),
-              );
+            if (runsResponse?.workflow_runs?.length > 0) {
+              const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+              // Find the most recent workflow_dispatch run created in the last 5 minutes
+              // Runs are returned sorted by created_at descending, so the first match wins
+              const matchingRun = runsResponse.workflow_runs.find((run: any) => {
+                if (run.event !== "workflow_dispatch") return false;
+                if (run.created_at < fiveMinutesAgo) return false;
+                return true;
+              });
+
               if (matchingRun) {
-                workflowRunId = matchingRun.id;
+                workflowRunId = matchingRun.id as number;
+                // Persist so future polls skip the search
+                await prisma.release.update({
+                  where: { id: release.id },
+                  data: { workflowRunId: BigInt(matchingRun.id) },
+                });
               }
             }
-          } catch {
-            // Non-fatal: we'll return release info without workflow status
+          } catch (err: any) {
+            if (err instanceof AppError && err.code === "GITHUB_PAT_MISSING") {
+              throw err;
+            }
+            if (err instanceof AppError && err.message.includes("403")) {
+              throw new AppError(
+                502,
+                "GitHub PAT does not have permission to access workflow runs. Ensure the token has the 'actions:read' scope.",
+                "GITHUB_PERMISSION_DENIED",
+              );
+            }
+            // Non-fatal for other errors: fall through to pending response
           }
         }
+      }
+
+      // Helper: return a "pending/queued" response while the run hasn't appeared yet
+      const pendingResponse = (message: string) =>
+        res.json({
+          success: true,
+          data: {
+            id: releaseId || "",
+            status: "queued" as const,
+            targets: [],
+            logs: [],
+            startedAt: null,
+            completedAt: null,
+          },
+          error: null,
+          message,
+        });
+
+      // If we still don't have a workflowRunId, return pending status.
+      // The frontend will keep polling every 5s until the run appears.
+      if (!workflowRunId) {
+        pendingResponse("Build triggered, waiting for GitHub Actions to start...");
+        return;
       }
 
       // Fetch workflow run details from GitHub
       let workflowRun: any = null;
       let jobs: any[] = [];
 
-      if (workflowRunId) {
-        try {
-          workflowRun = await githubFetch(
-            `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${workflowRunId}`,
-          );
+      try {
+        workflowRun = await githubFetch(
+          `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${workflowRunId}`,
+        );
 
-          const jobsResponse = await githubFetch(
-            `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${workflowRunId}/jobs`,
-          );
+        const jobsResponse = await githubFetch(
+          `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${workflowRunId}/jobs`,
+        );
 
-          jobs = (jobsResponse?.jobs || []).map((job: any) => ({
-            id: job.id,
-            name: job.name,
-            status: job.status, // queued, in_progress, completed
-            conclusion: job.conclusion, // success, failure, cancelled, skipped, null
-            startedAt: job.started_at,
-            completedAt: job.completed_at,
-            steps: (job.steps || []).map((step: any) => ({
-              name: step.name,
-              status: step.status,
-              conclusion: step.conclusion,
-              number: step.number,
-            })),
-          }));
-        } catch (err: any) {
-          // If the workflow run doesn't exist or PAT can't access it, include the error
-          if (err instanceof AppError && err.code === "GITHUB_PAT_MISSING") {
-            throw err;
-          }
-          // Otherwise treat as non-fatal
+        jobs = jobsResponse?.jobs || [];
+      } catch (err: any) {
+        if (err instanceof AppError && err.code === "GITHUB_PAT_MISSING") {
+          throw err;
+        }
+        if (err instanceof AppError && err.message.includes("403")) {
+          throw new AppError(
+            502,
+            "GitHub PAT does not have permission to read workflow runs. Ensure the token has the 'actions:read' scope.",
+            "GITHUB_PERMISSION_DENIED",
+          );
+        }
+        // If the run was deleted or isn't accessible yet, return pending
+        pendingResponse("Workflow run not accessible yet. Retrying...");
+        return;
+      }
+
+      // Map GitHub run status to the frontend's expected status values
+      // GitHub uses: queued | in_progress | completed (with conclusion: success | failure | cancelled)
+      // Frontend expects: queued | building | success | failed | cancelled
+      let frontendStatus: "queued" | "building" | "success" | "failed" | "cancelled";
+      if (workflowRun.status === "completed") {
+        if (workflowRun.conclusion === "success") {
+          frontendStatus = "success";
+        } else if (workflowRun.conclusion === "cancelled") {
+          frontendStatus = "cancelled";
+        } else {
+          frontendStatus = "failed";
+        }
+      } else if (workflowRun.status === "in_progress") {
+        frontendStatus = "building";
+      } else {
+        frontendStatus = "queued";
+      }
+
+      // Map GitHub jobs to the frontend's BuildTarget shape
+      const targets = jobs.map((job: any) => {
+        // Infer platform/arch from job name (e.g. "Build Windows x64", "Build Linux")
+        const nameLower = (job.name || "").toLowerCase();
+        let platform = "unknown";
+        let arch = "x86_64";
+
+        if (nameLower.includes("windows") || nameLower.includes("win")) {
+          platform = "windows";
+        } else if (nameLower.includes("linux")) {
+          platform = "linux";
+        } else if (nameLower.includes("android")) {
+          platform = "android";
+        } else if (nameLower.includes("macos") || nameLower.includes("mac")) {
+          platform = "macos";
+        }
+
+        if (nameLower.includes("arm64") || nameLower.includes("aarch64")) {
+          arch = "arm64";
+        } else if (nameLower.includes("x64") || nameLower.includes("x86_64") || nameLower.includes("amd64")) {
+          arch = "x86_64";
+        }
+
+        // Map job status to target status
+        let targetStatus: "pending" | "building" | "success" | "error";
+        if (job.status === "completed") {
+          targetStatus = job.conclusion === "success" ? "success" : "error";
+        } else if (job.status === "in_progress") {
+          targetStatus = "building";
+        } else {
+          targetStatus = "pending";
+        }
+
+        // Calculate elapsed seconds
+        let elapsed = 0;
+        if (job.started_at) {
+          const end = job.completed_at ? new Date(job.completed_at) : new Date();
+          elapsed = Math.round((end.getTime() - new Date(job.started_at).getTime()) / 1000);
+        }
+
+        // Estimate progress based on completed steps
+        let progress = 0;
+        const totalSteps = (job.steps || []).length;
+        if (totalSteps > 0) {
+          const completedSteps = (job.steps || []).filter(
+            (s: any) => s.status === "completed",
+          ).length;
+          progress = Math.round((completedSteps / totalSteps) * 100);
+        }
+        if (targetStatus === "success") progress = 100;
+
+        return {
+          platform: platform !== "unknown" ? platform : job.name,
+          arch,
+          status: targetStatus,
+          progress,
+          elapsed,
+          error: job.conclusion === "failure" ? `Job "${job.name}" failed` : undefined,
+        };
+      });
+
+      // Build a simple log from job step names and their statuses
+      const logs: string[] = [];
+      for (const job of jobs) {
+        for (const step of job.steps || []) {
+          const icon =
+            step.conclusion === "success"
+              ? "[ok]"
+              : step.conclusion === "failure"
+                ? "[FAIL]"
+                : step.status === "in_progress"
+                  ? "[...]"
+                  : "[ ]";
+          logs.push(`${icon} ${job.name} > ${step.name}`);
         }
       }
 
       res.json({
         success: true,
         data: {
-          release: release
-            ? {
-                id: release.id,
-                version: release.version,
-                channel: release.channel,
-                publishedAt: release.publishedAt,
-                assetCount: release.assets?.length ?? 0,
-              }
-            : null,
-          workflow: workflowRun
-            ? {
-                runId: workflowRun.id,
-                status: workflowRun.status, // queued, in_progress, completed
-                conclusion: workflowRun.conclusion, // success, failure, cancelled, null
-                htmlUrl: workflowRun.html_url,
-                createdAt: workflowRun.created_at,
-                updatedAt: workflowRun.updated_at,
-                runStartedAt: workflowRun.run_started_at,
-              }
-            : null,
-          jobs,
+          id: releaseId || String(workflowRunId),
+          status: frontendStatus,
+          targets,
+          logs,
+          startedAt: workflowRun.run_started_at || workflowRun.created_at || null,
+          completedAt:
+            workflowRun.status === "completed" ? workflowRun.updated_at : null,
         },
         error: null,
-        message: workflowRun
-          ? `Build status: ${workflowRun.status}${workflowRun.conclusion ? ` (${workflowRun.conclusion})` : ""}`
-          : "No workflow run found. The build may not have started yet.",
+        message: `Build status: ${frontendStatus}`,
       });
     } catch (err) {
       next(err);

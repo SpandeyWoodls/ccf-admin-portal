@@ -588,13 +588,14 @@ function ReleaseCard({
   isImporting,
 }: {
   release: PageRelease;
-  onPublish: (id: string) => void;
+  onPublish: (id: string, force?: boolean) => void;
   onBlock: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit: (release: PageRelease) => void;
   onImportAssets: (id: string) => void;
   isImporting: boolean;
 }) {
+  const canForcePublish = useCan("releases.block"); // super_admin only
   const [expanded, setExpanded] = useState(false);
   const status = getReleaseStatus(release);
   const statusCfg = statusConfig[status];
@@ -774,27 +775,48 @@ function ReleaseCard({
             <div className="flex items-center gap-2">
               <RoleGuard permission="releases.publish">
                 {status === "draft" && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span tabIndex={0}>
-                          <Button
-                            size="sm"
-                            disabled={!release.assets || release.assets.length === 0}
-                            onClick={() => onPublish(release.id)}
-                          >
-                            <Rocket className="h-3.5 w-3.5" />
-                            Publish
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      {(!release.assets || release.assets.length === 0) && (
-                        <TooltipContent>
-                          <p>Import assets before publishing</p>
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-                  </TooltipProvider>
+                  <>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span tabIndex={0}>
+                            <Button
+                              size="sm"
+                              onClick={() => onPublish(release.id)}
+                            >
+                              <Rocket className="h-3.5 w-3.5" />
+                              Publish
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {(!release.assets || release.assets.length === 0) && (
+                          <TooltipContent>
+                            <p>No assets yet -- will prompt to import from GitHub</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
+                    {canForcePublish && (!release.assets || release.assets.length === 0) && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-[hsl(var(--warning)/0.4)] text-[hsl(var(--warning))]"
+                              onClick={() => onPublish(release.id, true)}
+                            >
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              Force Publish
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Publish without assets (super_admin only, for testing)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </>
                 )}
               </RoleGuard>
               <RoleGuard permission="releases.block">
@@ -1406,14 +1428,17 @@ export function ReleasesPage() {
     }
   };
 
-  const handlePublish = async (id: string) => {
+  const handlePublish = async (id: string, force = false) => {
     try {
-      await publishRelease(id);
+      await publishRelease(id, force);
       toast.success("Release published!");
+      fetchReleases();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to publish";
-      if (msg.includes("without assets")) {
-        toast.error("Import assets from GitHub before publishing");
+      if (msg.includes("NO_ASSETS") || msg.includes("No assets")) {
+        toast.error(
+          "No assets uploaded. Use 'Import from GitHub' to pull binaries, or use the Release Wizard to trigger a new build.",
+        );
       } else {
         toast.error(msg);
       }
@@ -1438,10 +1463,21 @@ export function ReleasesPage() {
     setIsImporting(true);
     try {
       await importAssets(releaseId);
-      toast.success("Assets imported from GitHub");
+      toast.success("Assets imported from GitHub successfully!");
       fetchReleases();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to import assets");
+      const msg = err instanceof Error ? err.message : "Failed to import assets";
+      if (msg.includes("GITHUB_RELEASE_NOT_FOUND") || msg.includes("No GitHub Release found")) {
+        toast.error(
+          "No GitHub Release found for this version. Use the Release Wizard to trigger a build first.",
+        );
+      } else if (msg.includes("NO_GITHUB_ASSETS") || msg.includes("has no assets")) {
+        toast.error(
+          "The GitHub Release exists but has no assets yet. The build may still be in progress.",
+        );
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setIsImporting(false);
     }

@@ -1,4 +1,4 @@
-import { PORTAL_URL } from "./email.js";
+import { getPortalUrl } from "./email.js";
 
 // ─── Base template wrapper with CCF branding ───────────────────────────────
 
@@ -106,7 +106,7 @@ export function licenseExpiryWarningEmail(
     <p style="color: #9ca3af; font-size: 13px; line-height: 1.5; margin: 16px 0 0 0;">
       Contact your administrator or reach out to the CCF team to renew your license before it expires.
     </p>
-    ${ctaButton("Renew License", `${PORTAL_URL}/licenses`)}
+    ${ctaButton("Renew License", `${getPortalUrl()}/licenses`)}
   `);
   return { subject, html };
 }
@@ -127,7 +127,7 @@ export function licenseExpiredEmail(
     <p style="color: #9ca3af; font-size: 13px; line-height: 1.5; margin: 16px 0 0 0;">
       To restore access, please renew your license immediately. All existing case data remains intact and will be accessible once the license is renewed.
     </p>
-    ${ctaButton("Renew Now", `${PORTAL_URL}/licenses`)}
+    ${ctaButton("Renew Now", `${getPortalUrl()}/licenses`)}
   `);
   return { subject, html };
 }
@@ -185,7 +185,7 @@ export function welcomeEmail(
     <p style="color: #9ca3af; font-size: 13px; line-height: 1.5; margin: 16px 0 0 0;">
       If you need assistance, use the in-app support system to raise a ticket. Our team is here to help.
     </p>
-    ${ctaButton("Open Admin Portal", PORTAL_URL)}
+    ${ctaButton("Open Admin Portal", getPortalUrl())}
   `);
   return { subject, html };
 }
