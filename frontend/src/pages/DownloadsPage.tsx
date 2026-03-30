@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   Download,
@@ -19,6 +20,7 @@ import {
   Fingerprint,
   ArrowDownToLine,
   Search,
+  UploadCloud,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -874,6 +876,7 @@ function LoadingSkeleton() {
 // ---------------------------------------------------------------------------
 
 export function DownloadsPage() {
+  const navigate = useNavigate();
   const {
     releases: storeReleases,
     isLoading: loading,
@@ -971,35 +974,39 @@ export function DownloadsPage() {
               <p className="text-sm text-[hsl(var(--muted-foreground))]">
                 {loading
                   ? "Loading releases..."
-                  : `${releases.length} published releases available`}
+                  : releases.length === 0
+                    ? "Manage and distribute software releases"
+                    : `${releases.length} published ${releases.length === 1 ? "release" : "releases"} available`}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--muted-foreground)/0.5)]" />
-            <Input
-              placeholder="Search versions..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-48 pl-9 text-sm bg-[hsl(var(--card))] border-[hsl(var(--border))]"
-            />
+        {/* Filters - only show when there are releases to filter */}
+        {!loading && releases.length > 0 && (
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--muted-foreground)/0.5)]" />
+              <Input
+                placeholder="Search versions..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-48 pl-9 text-sm bg-[hsl(var(--card))] border-[hsl(var(--border))]"
+              />
+            </div>
+            <Select value={channelFilter} onValueChange={setChannelFilter}>
+              <SelectTrigger className="w-32 bg-[hsl(var(--card))] border-[hsl(var(--border))]">
+                <SelectValue placeholder="Channel" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Channels</SelectItem>
+                <SelectItem value="stable">Stable</SelectItem>
+                <SelectItem value="beta">Beta</SelectItem>
+                <SelectItem value="rc">RC</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={channelFilter} onValueChange={setChannelFilter}>
-            <SelectTrigger className="w-32 bg-[hsl(var(--card))] border-[hsl(var(--border))]">
-              <SelectValue placeholder="Channel" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Channels</SelectItem>
-              <SelectItem value="stable">Stable</SelectItem>
-              <SelectItem value="beta">Beta</SelectItem>
-              <SelectItem value="rc">RC</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        )}
       </div>
 
       {loading ? (
@@ -1048,35 +1055,80 @@ export function DownloadsPage() {
 
           {/* Empty state */}
           {filteredReleases.length === 0 && (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--card)/0.5)] py-16">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--muted)/0.5)]">
-                <Package className="h-7 w-7 text-[hsl(var(--muted-foreground)/0.5)]" />
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--card)/0.5)] py-20 px-6">
+              {/* Illustration area */}
+              <div className="relative mb-6">
+                <div className="absolute -inset-4 rounded-full bg-[hsl(var(--primary)/0.05)]" />
+                <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--muted))]">
+                  <UploadCloud className="h-10 w-10 text-[hsl(var(--muted-foreground)/0.5)]" />
+                </div>
               </div>
-              <p className="mt-4 text-sm font-medium text-[hsl(var(--muted-foreground))]">
-                {searchQuery || channelFilter !== "all"
-                  ? "No releases found"
-                  : "No published releases available for download."}
-              </p>
-              {(searchQuery || channelFilter !== "all") && (
-                <p className="mt-1 text-xs text-[hsl(var(--muted-foreground)/0.6)]">
-                  Try adjusting your search or channel filter
-                </p>
+
+              {searchQuery || channelFilter !== "all" ? (
+                <>
+                  <h3 className="text-base font-semibold text-[hsl(var(--foreground))]">
+                    No releases found
+                  </h3>
+                  <p className="mt-2 max-w-sm text-center text-sm text-[hsl(var(--muted-foreground))]">
+                    Try adjusting your search or channel filter to find the release you're looking for.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-5 gap-2"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setChannelFilter("all");
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-base font-semibold text-[hsl(var(--foreground))]">
+                    No downloads available
+                  </h3>
+                  <p className="mt-2 max-w-md text-center text-sm text-[hsl(var(--muted-foreground))]">
+                    Publish a release first, then it will appear here for download.
+                  </p>
+                  <p className="mt-1.5 max-w-sm text-center text-xs text-[hsl(var(--muted-foreground)/0.6)]">
+                    Create and publish releases from the Releases page to make installers available.
+                  </p>
+                  <Button
+                    className="mt-5 gap-2 bg-[hsl(var(--primary))] text-white hover:bg-[hsl(var(--primary)/0.9)]"
+                    onClick={() => navigate("/releases")}
+                  >
+                    <Package className="h-4 w-4" />
+                    Go to Releases
+                  </Button>
+                </>
               )}
+
+              {/* Security notice integrated into empty state */}
+              <div className="mt-8 flex items-start gap-2.5 rounded-lg border border-[hsl(var(--border)/0.3)] bg-[hsl(var(--muted)/0.1)] p-3.5 max-w-lg text-xs text-[hsl(var(--muted-foreground)/0.6)]">
+                <Shield className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--primary)/0.4)]" />
+                <p>
+                  All installers are code-signed and include SHA-256 checksums for
+                  integrity verification. Downloads are logged for audit compliance.
+                </p>
+              </div>
             </div>
           )}
 
-          {/* Footer note */}
-          <div className="flex items-start gap-2.5 rounded-lg border border-[hsl(var(--border)/0.4)] bg-[hsl(var(--muted)/0.15)] p-4 text-xs text-[hsl(var(--muted-foreground)/0.7)]">
-            <Shield className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--primary)/0.5)]" />
-            <div>
-              <p>
-                All installers are code-signed and include SHA-256 checksums for
-                integrity verification. Always verify the hash before deploying
-                to production forensic workstations. Downloads are logged for
-                audit compliance.
-              </p>
+          {/* Footer note - only when releases exist */}
+          {filteredReleases.length > 0 && (
+            <div className="flex items-start gap-2.5 rounded-lg border border-[hsl(var(--border)/0.4)] bg-[hsl(var(--muted)/0.15)] p-4 text-xs text-[hsl(var(--muted-foreground)/0.7)]">
+              <Shield className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--primary)/0.5)]" />
+              <div>
+                <p>
+                  All installers are code-signed and include SHA-256 checksums for
+                  integrity verification. Always verify the hash before deploying
+                  to production forensic workstations. Downloads are logged for
+                  audit compliance.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </>
       )}
     </div>

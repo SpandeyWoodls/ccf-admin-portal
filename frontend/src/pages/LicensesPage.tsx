@@ -58,7 +58,7 @@ const statusConfig: Record<
   expired: { label: "Expired", variant: "destructive" },
   suspended: { label: "Suspended", variant: "warning" },
   revoked: { label: "Revoked", variant: "destructive" },
-  issued: { label: "Issued", variant: "default" },
+  issued: { label: "Issued", variant: "secondary" },
 };
 
 const tierConfig: Record<
@@ -303,7 +303,9 @@ export function LicensesPage() {
                         {maskLicenseKey(lic.licenseKey)}
                       </TableCell>
                       <TableCell className="font-medium">
-                        {lic.organization?.name || "---"}
+                        {lic.organization?.name || (
+                          <span className="text-[hsl(var(--muted-foreground))] italic">Unassigned</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant={tier.variant} className="text-[10px]">

@@ -444,7 +444,7 @@ export function AuditPage() {
       }
       return true;
     });
-  }, [appliedFilters]);
+  }, [allLogs, appliedFilters]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const paginated = filtered.slice(

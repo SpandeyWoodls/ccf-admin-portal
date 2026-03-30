@@ -515,31 +515,34 @@ export function TrialsPage() {
             Review and manage incoming trial license requests.
           </p>
         </div>
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-20">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--muted))]">
-              <FlaskConical className="h-7 w-7 text-[hsl(var(--muted-foreground))]" />
-            </div>
-            <h3 className="mt-4 text-lg font-semibold text-[hsl(var(--foreground))]">
-              No trial requests yet
-            </h3>
-            <p className="mt-1 max-w-sm text-center text-sm text-[hsl(var(--muted-foreground))]">
-              {error
-                ? "Could not connect to the server. Trial requests will appear here once the backend is available."
-                : "When users request trial licenses from the desktop app, their requests will appear here for review."}
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--card)/0.5)] py-20">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--muted))]">
+            <FlaskConical className="h-8 w-8 text-[hsl(var(--muted-foreground)/0.7)]" />
+          </div>
+          <h3 className="mt-4 text-lg font-semibold text-[hsl(var(--foreground))]">
+            No trial requests yet
+          </h3>
+          <p className="mt-1.5 max-w-sm text-center text-sm text-[hsl(var(--muted-foreground))]">
+            {error
+              ? "Could not connect to the server. Trial requests will appear here once the backend is available."
+              : "Trial requests will appear here when users request from the desktop app."}
+          </p>
+          {!error && (
+            <p className="mt-3 max-w-xs text-center text-xs text-[hsl(var(--muted-foreground)/0.6)]">
+              You'll be able to approve, deny, or extend trials directly from this page.
             </p>
-            {error && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4"
-                onClick={() => fetchTrials({ page: 1, limit: 50 })}
-              >
-                Retry
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+          )}
+          {error && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={() => fetchTrials({ page: 1, limit: 50 })}
+            >
+              Retry
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
@@ -647,11 +650,13 @@ export function TrialsPage() {
                     className="py-16 text-center"
                   >
                     <div className="flex flex-col items-center gap-2">
-                      <FileText className="h-8 w-8 text-[hsl(var(--muted-foreground))]" />
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--muted)/0.7)]">
+                        <FileText className="h-6 w-6 text-[hsl(var(--muted-foreground)/0.6)]" />
+                      </div>
                       <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
                         No trial requests found
                       </p>
-                      <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                      <p className="text-xs text-[hsl(var(--muted-foreground)/0.7)]">
                         {search
                           ? "Try adjusting your search query."
                           : "New requests will appear here."}

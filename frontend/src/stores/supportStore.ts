@@ -16,6 +16,7 @@ export interface TicketMessage {
 
 export interface Ticket {
   id: string;
+  ticketNumber: string;
   subject: string;
   status: string;
   priority: string;

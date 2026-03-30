@@ -17,7 +17,7 @@ export function maskLicenseKey(key: string): string {
   if (key.length < 8) return key;
   const parts = key.split("-");
   if (parts.length >= 4) {
-    return `${parts[0]}-${parts[1].substring(0, 2)}**-${"*".repeat(4)}-${"*".repeat(4)}`;
+    return `${parts[0]}-${parts[1]}-${"*".repeat(4)}-${"*".repeat(4)}`;
   }
   return key.substring(0, 6) + "*".repeat(key.length - 6);
 }

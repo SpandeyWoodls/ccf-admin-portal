@@ -63,10 +63,12 @@ function ChartEmptyState({
 }: ChartEmptyStateProps) {
   return (
     <div className={cn("flex items-center justify-center", height)}>
-      <div className="text-center text-[hsl(var(--muted-foreground))]">
-        <Icon className="h-8 w-8 mx-auto mb-2 opacity-50" />
-        <p className="text-sm">{title}</p>
-        <p className="text-xs mt-1 opacity-75">{subtitle}</p>
+      <div className="flex flex-col items-center text-center text-[hsl(var(--muted-foreground))]">
+        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--muted)/0.5)]">
+          <Icon className="h-7 w-7 opacity-40" />
+        </div>
+        <p className="text-sm font-medium">{title}</p>
+        <p className="mt-1 max-w-[220px] text-xs opacity-60 leading-relaxed">{subtitle}</p>
       </div>
     </div>
   );
@@ -115,9 +117,9 @@ export function AnalyticsPage() {
               key={tr.value}
               onClick={() => setTimeRange(tr.value)}
               className={cn(
-                "rounded-md px-3 py-1.5 text-xs font-semibold transition-all duration-200",
+                "rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all duration-200",
                 timeRange === tr.value
-                  ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-sm"
+                  ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-md ring-1 ring-[hsl(var(--primary)/0.3)]"
                   : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"
               )}
             >
@@ -147,8 +149,8 @@ export function AnalyticsPage() {
                 </p>
               </div>
               <div
-                className="flex h-10 w-10 items-center justify-center rounded-xl"
-                style={{ backgroundColor: `${CHART_COLORS.chart1}15` }}
+                className="flex h-11 w-11 items-center justify-center rounded-full"
+                style={{ backgroundColor: `${CHART_COLORS.chart1}20` }}
               >
                 <Users className="h-5 w-5" style={{ color: CHART_COLORS.chart1 }} />
               </div>
@@ -176,8 +178,8 @@ export function AnalyticsPage() {
                 </p>
               </div>
               <div
-                className="flex h-10 w-10 items-center justify-center rounded-xl"
-                style={{ backgroundColor: `${CHART_COLORS.chart2}15` }}
+                className="flex h-11 w-11 items-center justify-center rounded-full"
+                style={{ backgroundColor: `${CHART_COLORS.chart2}20` }}
               >
                 <UserCheck className="h-5 w-5" style={{ color: CHART_COLORS.chart2 }} />
               </div>
@@ -205,8 +207,8 @@ export function AnalyticsPage() {
                 </p>
               </div>
               <div
-                className="flex h-10 w-10 items-center justify-center rounded-xl"
-                style={{ backgroundColor: `${CHART_COLORS.chart3}15` }}
+                className="flex h-11 w-11 items-center justify-center rounded-full"
+                style={{ backgroundColor: `${CHART_COLORS.chart3}20` }}
               >
                 <Briefcase className="h-5 w-5" style={{ color: CHART_COLORS.chart3 }} />
               </div>
@@ -244,8 +246,8 @@ export function AnalyticsPage() {
                 </p>
               </div>
               <div
-                className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-xl"
-                style={{ backgroundColor: `${CHART_COLORS.chart4}15` }}
+                className="absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-full"
+                style={{ backgroundColor: `${CHART_COLORS.chart4}20` }}
               >
                 <Gauge className="h-5 w-5" style={{ color: CHART_COLORS.chart4 }} />
               </div>
@@ -311,26 +313,40 @@ export function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             {hasTierData ? (
-              <div className="space-y-3 py-4">
-                {stats!.licensesByTier.map((item) => {
-                  const maxCount = Math.max(...stats!.licensesByTier.map((t) => t.count), 1);
-                  const pct = (item.count / maxCount) * 100;
+              <div className="space-y-4 py-4">
+                {stats!.licensesByTier.map((item, idx) => {
+                  const total = stats!.licensesByTier.reduce((sum, t) => sum + t.count, 0) || 1;
+                  const pct = (item.count / total) * 100;
+                  const colors = [CHART_COLORS.chart1, CHART_COLORS.chart2, CHART_COLORS.chart3, CHART_COLORS.chart4, CHART_COLORS.chart5];
+                  const barColor = colors[idx % colors.length];
+                  const tierLabel = item.tier.charAt(0).toUpperCase() + item.tier.slice(1);
                   return (
-                    <div key={item.tier} className="space-y-1.5">
+                    <div key={item.tier} className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-[hsl(var(--muted-foreground))]">
-                          {item.tier}
-                        </span>
-                        <span className="text-sm font-semibold text-[hsl(var(--foreground))]">
-                          {item.count}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: barColor }}
+                          />
+                          <span className="text-sm font-medium text-[hsl(var(--foreground))]">
+                            {tierLabel}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-sm font-semibold text-[hsl(var(--foreground))]">
+                            {item.count}
+                          </span>
+                          <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                            ({pct.toFixed(0)}%)
+                          </span>
+                        </div>
                       </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-[hsl(var(--muted))]">
+                      <div className="h-2.5 w-full overflow-hidden rounded-full bg-[hsl(var(--muted))]">
                         <div
-                          className="h-full rounded-full transition-all duration-700"
+                          className="h-full rounded-full transition-all duration-700 ease-out"
                           style={{
-                            width: `${pct}%`,
-                            backgroundColor: CHART_COLORS.chart1,
+                            width: `${Math.max(pct, 3)}%`,
+                            backgroundColor: barColor,
                           }}
                         />
                       </div>
@@ -357,36 +373,43 @@ export function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             {hasStatusData ? (
-              <div className="space-y-3 py-4">
+              <div className="space-y-4 py-4">
                 {stats!.licensesByStatus.map((item) => {
-                  const maxCount = Math.max(...stats!.licensesByStatus.map((s) => s.count), 1);
-                  const pct = (item.count / maxCount) * 100;
+                  const total = stats!.licensesByStatus.reduce((sum, s) => sum + s.count, 0) || 1;
+                  const pct = (item.count / total) * 100;
                   const color =
                     item.status === "active" ? CHART_COLORS.success
                     : item.status === "expired" ? CHART_COLORS.destructive
                     : item.status === "suspended" ? CHART_COLORS.warning
+                    : item.status === "issued" ? CHART_COLORS.chart2
                     : CHART_COLORS.chart3;
+                  const statusLabel = item.status.charAt(0).toUpperCase() + item.status.slice(1);
                   return (
-                    <div key={item.status} className="space-y-1.5">
+                    <div key={item.status} className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div
                             className="h-2.5 w-2.5 rounded-full"
                             style={{ backgroundColor: color }}
                           />
-                          <span className="text-sm capitalize text-[hsl(var(--muted-foreground))]">
-                            {item.status}
+                          <span className="text-sm font-medium text-[hsl(var(--foreground))]">
+                            {statusLabel}
                           </span>
                         </div>
-                        <span className="text-sm font-semibold text-[hsl(var(--foreground))]">
-                          {item.count}
-                        </span>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-sm font-semibold text-[hsl(var(--foreground))]">
+                            {item.count}
+                          </span>
+                          <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                            ({pct.toFixed(0)}%)
+                          </span>
+                        </div>
                       </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-[hsl(var(--muted))]">
+                      <div className="h-2.5 w-full overflow-hidden rounded-full bg-[hsl(var(--muted))]">
                         <div
-                          className="h-full rounded-full transition-all duration-700"
+                          className="h-full rounded-full transition-all duration-700 ease-out"
                           style={{
-                            width: `${pct}%`,
+                            width: `${Math.max(pct, 3)}%`,
                             backgroundColor: color,
                           }}
                         />

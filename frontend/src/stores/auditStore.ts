@@ -34,6 +34,20 @@ interface Pagination {
   totalPages: number;
 }
 
+/** Shape of a single audit log item as returned by the backend */
+interface BackendAuditLog {
+  id: string;
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  admin: { id: string; name: string; email: string } | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  oldValues: Record<string, unknown> | null;
+  newValues: Record<string, unknown> | null;
+  createdAt: string;
+}
+
 /** Shape returned by the backend paginated() helper */
 interface BackendPaginatedResponse<T> {
   items: T[];
@@ -89,9 +103,21 @@ export const useAuditStore = create<AuditState>()((set) => ({
 
       const query = params.toString();
       const path = `/api/v1/admin/audit${query ? `?${query}` : ""}`;
-      const raw = await apiGet<BackendPaginatedResponse<AuditLog>>(path);
+      const raw = await apiGet<BackendPaginatedResponse<BackendAuditLog>>(path);
+      // Map backend field name "admin" to frontend "adminUser"
+      const logs: AuditLog[] = raw.items.map((item) => ({
+        id: item.id,
+        action: item.action,
+        resourceType: item.resourceType,
+        resourceId: item.resourceId,
+        adminUser: item.admin,
+        ipAddress: item.ipAddress,
+        userAgent: item.userAgent,
+        metadata: item.oldValues ?? item.newValues ?? null,
+        createdAt: item.createdAt,
+      }));
       set({
-        logs: raw.items,
+        logs,
         pagination: {
           page: raw.page,
           limit: raw.pageSize,

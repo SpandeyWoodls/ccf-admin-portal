@@ -1,4 +1,5 @@
 import { useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import {
   KeyRound,
   AlertTriangle,
@@ -12,6 +13,7 @@ import {
   UserPlus,
   Package,
   RefreshCw,
+  BarChart3,
 } from "lucide-react";
 import {
   PieChart,
@@ -24,6 +26,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip as RechartsTooltip,
+  Label,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -194,7 +197,7 @@ function ChartSkeleton() {
 
 export function DashboardPage() {
   const { user } = useAuthStore();
-  const firstName = user?.name?.split(" ")[0] || "Admin";
+  const displayName = user?.name || "Admin";
 
   const { stats, isLoading, fetchStats } = useDashboardStore();
 
@@ -293,7 +296,7 @@ export function DashboardPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[hsl(var(--foreground))]">
-            Welcome back, {firstName}
+            Welcome back, {displayName}
           </h1>
           <p className="text-sm text-[hsl(var(--muted-foreground))]">
             Here's an overview of your forensics license management system.
@@ -376,9 +379,20 @@ export function DashboardPage() {
               </CardHeader>
               <CardContent>
                 {distributionData.length === 0 ? (
-                  <div className="flex h-52 items-center justify-center">
+                  <div className="flex h-52 flex-col items-center justify-center gap-3">
+                    {/* Faded donut ring illustration */}
+                    <svg width="80" height="80" viewBox="0 0 80 80" className="opacity-20">
+                      <circle
+                        cx="40" cy="40" r="30"
+                        fill="none"
+                        stroke="hsl(var(--muted-foreground))"
+                        strokeWidth="10"
+                        strokeDasharray="47 16"
+                        strokeLinecap="round"
+                      />
+                    </svg>
                     <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                      No data yet
+                      No license data yet
                     </p>
                   </div>
                 ) : (
@@ -392,13 +406,46 @@ export function DashboardPage() {
                             cy="50%"
                             innerRadius={55}
                             outerRadius={80}
-                            paddingAngle={4}
+                            paddingAngle={distributionData.length > 1 ? 4 : 0}
                             dataKey="value"
                             strokeWidth={0}
                           >
                             {distributionData.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={entry.color} />
                             ))}
+                            <Label
+                              content={() => {
+                                const total = distributionData.reduce((sum, item) => sum + item.value, 0);
+                                return (
+                                  <text
+                                    x="50%"
+                                    y="50%"
+                                    textAnchor="middle"
+                                    dominantBaseline="central"
+                                  >
+                                    <tspan
+                                      x="50%"
+                                      dy="-0.4em"
+                                      className="fill-[hsl(var(--foreground))]"
+                                      fontSize="22"
+                                      fontWeight="700"
+                                    >
+                                      {total}
+                                    </tspan>
+                                    <tspan
+                                      x="50%"
+                                      dy="1.4em"
+                                      className="fill-[hsl(var(--muted-foreground))]"
+                                      fontSize="11"
+                                      fontWeight="500"
+                                    >
+                                      {total === 1 ? "license" : "licenses"}
+                                    </tspan>
+                                  </text>
+                                );
+                              }}
+                              position="center"
+                            />
                           </Pie>
                           <RechartsTooltip
                             contentStyle={{
@@ -454,10 +501,29 @@ export function DashboardPage() {
               </CardHeader>
               <CardContent>
                 {activationsData.length === 0 ? (
-                  <div className="flex h-52 items-center justify-center">
-                    <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                      No data yet
-                    </p>
+                  <div className="flex h-52 flex-col items-center justify-center gap-3">
+                    {/* Faded line chart illustration */}
+                    <svg width="120" height="60" viewBox="0 0 120 60" className="opacity-15">
+                      <line x1="0" y1="55" x2="120" y2="55" stroke="hsl(var(--muted-foreground))" strokeWidth="1" />
+                      <line x1="5" y1="0" x2="5" y2="55" stroke="hsl(var(--muted-foreground))" strokeWidth="1" />
+                      {/* Dashed grid lines */}
+                      <line x1="5" y1="15" x2="120" y2="15" stroke="hsl(var(--muted-foreground))" strokeWidth="0.5" strokeDasharray="4 3" />
+                      <line x1="5" y1="35" x2="120" y2="35" stroke="hsl(var(--muted-foreground))" strokeWidth="0.5" strokeDasharray="4 3" />
+                      {/* Placeholder trend line */}
+                      <polyline
+                        points="10,42 30,38 50,28 70,32 90,18 115,12"
+                        fill="none"
+                        stroke="hsl(var(--chart-1))"
+                        strokeWidth="2"
+                        strokeDasharray="6 4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    <div className="flex items-center gap-1.5 text-sm text-[hsl(var(--muted-foreground))]">
+                      <BarChart3 className="h-3.5 w-3.5" />
+                      Activation data will appear here
+                    </div>
                   </div>
                 ) : (
                   <div className="h-52">
@@ -525,17 +591,18 @@ export function DashboardPage() {
             <CardTitle className="text-base font-semibold">
               Recent Activity
             </CardTitle>
-            <a
-              href="/audit"
+            <Link
+              to="/audit"
               className="text-xs font-medium text-[hsl(var(--primary))] hover:underline"
             >
               View all
-            </a>
+            </Link>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           {activityRows.length === 0 ? (
-            <div className="flex h-32 items-center justify-center">
+            <div className="flex h-32 flex-col items-center justify-center gap-2">
+              <Clock className="h-5 w-5 text-[hsl(var(--muted-foreground))] opacity-40" />
               <p className="text-sm text-[hsl(var(--muted-foreground))]">
                 No recent activity
               </p>

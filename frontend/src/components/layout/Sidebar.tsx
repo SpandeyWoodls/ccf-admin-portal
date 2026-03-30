@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/authStore";
+import { useDashboardStore } from "@/stores/dashboardStore";
 import { hasPermission, type AdminRole, type Permission } from "@/lib/rbac";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -43,6 +44,8 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
+  /** Key used to look up a dynamic badge count from dashboard stats. */
+  badgeKey?: string;
   /** If set, the item is only shown when the user has this permission. */
   requiredPermission?: Permission;
 }
@@ -62,9 +65,9 @@ const navigation: NavSection[] = [
   {
     title: "MANAGEMENT",
     items: [
-      { label: "Organizations", href: "/organizations", icon: Building2, badge: 12, requiredPermission: "organizations.view" },
-      { label: "Licenses", href: "/licenses", icon: KeyRound, badge: 48, requiredPermission: "licenses.view" },
-      { label: "Trials", href: "/trials", icon: FlaskConical, badge: 3, requiredPermission: "trials.view" },
+      { label: "Organizations", href: "/organizations", icon: Building2, badgeKey: "totalOrganizations", requiredPermission: "organizations.view" },
+      { label: "Licenses", href: "/licenses", icon: KeyRound, badgeKey: "totalActiveLicenses", requiredPermission: "licenses.view" },
+      { label: "Trials", href: "/trials", icon: FlaskConical, badgeKey: "activeTrials", requiredPermission: "trials.view" },
     ],
   },
   {
@@ -79,7 +82,7 @@ const navigation: NavSection[] = [
       { label: "Releases", href: "/releases", icon: Package, requiredPermission: "releases.view" },
       { label: "Downloads", href: "/downloads", icon: Download, requiredPermission: "downloads.view" },
       { label: "Announcements", href: "/announcements", icon: Megaphone, requiredPermission: "announcements.view" },
-      { label: "Support", href: "/support", icon: LifeBuoy, badge: 5, requiredPermission: "support.view" },
+      { label: "Support", href: "/support", icon: LifeBuoy, requiredPermission: "support.view" },
     ],
   },
   {
@@ -100,16 +103,44 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation();
   const { user, logout } = useAuthStore();
   const userRole = (user?.role ?? "") as AdminRole;
+  const { stats, fetchStats } = useDashboardStore();
 
-  // Filter navigation sections & items by the user's role permissions
+  // Fetch dashboard stats on mount so badge counts reflect real data
+  useEffect(() => {
+    if (!stats) {
+      fetchStats();
+    }
+  }, [stats, fetchStats]);
+
+  // Build a lookup from badgeKey -> count using live dashboard stats
+  const badgeCounts = useMemo<Record<string, number>>(() => {
+    if (!stats) return {} as Record<string, number>;
+    return {
+      totalOrganizations: stats.totalOrganizations,
+      totalActiveLicenses: stats.totalActiveLicenses,
+      activeTrials: stats.activeTrials,
+    };
+  }, [stats]);
+
+  // Filter navigation sections & items by the user's role permissions,
+  // and resolve dynamic badge counts from dashboard stats.
   const filteredNavigation = navigation
     .map((section) => ({
       ...section,
-      items: section.items.filter(
-        (item) =>
-          !item.requiredPermission ||
-          hasPermission(userRole, item.requiredPermission),
-      ),
+      items: section.items
+        .filter(
+          (item) =>
+            !item.requiredPermission ||
+            hasPermission(userRole, item.requiredPermission),
+        )
+        .map((item) => {
+          if (item.badgeKey && item.badgeKey in badgeCounts) {
+            const count = badgeCounts[item.badgeKey];
+            // Only show badge when count is a positive number
+            return { ...item, badge: count > 0 ? count : undefined };
+          }
+          return item;
+        }),
     }))
     .filter((section) => section.items.length > 0);
 

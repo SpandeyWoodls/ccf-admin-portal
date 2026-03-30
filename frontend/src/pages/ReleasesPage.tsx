@@ -409,10 +409,15 @@ function BlockDialog({
 function AssetsTable({ assets }: { assets: ReleaseAsset[] }) {
   if (assets.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-8 text-center">
-        <Package className="mb-2 h-8 w-8 text-[hsl(var(--muted-foreground))]" />
-        <p className="text-sm text-[hsl(var(--muted-foreground))]">
+      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[hsl(var(--border)/0.6)] py-10 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--muted)/0.7)]">
+          <Package className="h-6 w-6 text-[hsl(var(--muted-foreground)/0.6)]" />
+        </div>
+        <p className="mt-3 text-sm text-[hsl(var(--muted-foreground))]">
           No assets uploaded yet
+        </p>
+        <p className="mt-1 text-xs text-[hsl(var(--muted-foreground)/0.5)]">
+          Upload platform installers to this release
         </p>
       </div>
     );
@@ -1198,21 +1203,28 @@ export function ReleasesPage() {
 
       {/* Release Cards */}
       {filteredReleases.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--muted))]">
-              <Package className="h-7 w-7 text-[hsl(var(--muted-foreground))]" />
-            </div>
-            <h3 className="text-base font-semibold text-[hsl(var(--foreground))]">
-              No releases found
-            </h3>
-            <p className="mt-1 max-w-sm text-sm text-[hsl(var(--muted-foreground))]">
-              {searchQuery || channelFilter !== "all" || statusFilter !== "all"
-                ? "Try adjusting your search or filters."
-                : "No releases yet. Create your first release to start distributing software."}
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--card)/0.5)] py-20 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--muted))]">
+            <Package className="h-8 w-8 text-[hsl(var(--muted-foreground)/0.7)]" />
+          </div>
+          <h3 className="mt-4 text-base font-semibold text-[hsl(var(--foreground))]">
+            No releases found
+          </h3>
+          <p className="mt-1.5 max-w-sm text-sm text-[hsl(var(--muted-foreground))]">
+            {searchQuery || channelFilter !== "all" || statusFilter !== "all"
+              ? "Try adjusting your search or filters."
+              : "Create your first release to start distributing software."}
+          </p>
+          {!(searchQuery || channelFilter !== "all" || statusFilter !== "all") && (
+            <p className="mt-3 flex items-center gap-1.5 text-xs text-[hsl(var(--muted-foreground)/0.6)]">
+              Use the
+              <span className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--primary)/0.1)] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--primary))]">
+                <Plus className="h-3 w-3" /> New Release
+              </span>
+              button above to get started
             </p>
-          </CardContent>
-        </Card>
+          )}
+        </div>
       ) : (
         <div className="space-y-3">
           {filteredReleases.map((release) => (

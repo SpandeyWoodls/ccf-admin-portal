@@ -12,6 +12,9 @@ import {
   ExternalLink,
   Clock,
   Megaphone,
+  CheckCircle,
+  PauseCircle,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -660,22 +663,67 @@ export function AnnouncementsPage() {
       {/* Stats row */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { label: "Total", value: counts.total, color: "text-[hsl(var(--foreground))]" },
-          { label: "Active", value: counts.active, color: "text-emerald-400" },
-          { label: "Inactive", value: counts.inactive, color: "text-slate-400" },
-          { label: "Expired", value: counts.expired, color: "text-red-400" },
-        ].map((s) => (
-          <Card key={s.label}>
-            <CardContent className="p-4">
-              <p className="text-xs font-medium text-[hsl(var(--muted-foreground))]">
-                {s.label}
-              </p>
-              <p className={cn("mt-1 text-2xl font-bold", s.color)}>
-                {s.value}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+          {
+            label: "Total",
+            value: counts.total,
+            color: "text-[hsl(var(--foreground))]",
+            icon: Megaphone,
+            iconColor: "text-blue-400",
+            iconBg: "bg-blue-500/10",
+            border: "border-l-blue-500",
+          },
+          {
+            label: "Active",
+            value: counts.active,
+            color: "text-emerald-400",
+            icon: CheckCircle,
+            iconColor: "text-emerald-400",
+            iconBg: "bg-emerald-500/10",
+            border: "border-l-emerald-500",
+          },
+          {
+            label: "Inactive",
+            value: counts.inactive,
+            color: "text-slate-400",
+            icon: PauseCircle,
+            iconColor: "text-slate-400",
+            iconBg: "bg-slate-500/10",
+            border: "border-l-slate-500",
+          },
+          {
+            label: "Expired",
+            value: counts.expired,
+            color: "text-red-400",
+            icon: XCircle,
+            iconColor: "text-red-400",
+            iconBg: "bg-red-500/10",
+            border: "border-l-red-500",
+          },
+        ].map((s) => {
+          const Icon = s.icon;
+          return (
+            <Card key={s.label} className={cn("border-l-4", s.border)}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+                    {s.label}
+                  </p>
+                  <div
+                    className={cn(
+                      "flex h-8 w-8 items-center justify-center rounded-lg",
+                      s.iconBg,
+                    )}
+                  >
+                    <Icon className={cn("h-4 w-4", s.iconColor)} />
+                  </div>
+                </div>
+                <p className={cn("mt-1 text-2xl font-bold", s.color)}>
+                  {s.value}
+                </p>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -726,21 +774,28 @@ export function AnnouncementsPage() {
 
       {/* Announcement cards */}
       {filtered.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--muted))]">
-              <Megaphone className="h-7 w-7 text-[hsl(var(--muted-foreground))]" />
-            </div>
-            <h3 className="text-base font-semibold text-[hsl(var(--foreground))]">
-              No announcements found
-            </h3>
-            <p className="mt-1 max-w-xs text-sm text-[hsl(var(--muted-foreground))]">
-              {search || typeFilter !== "all" || statusFilter !== "all"
-                ? "Try adjusting your search or filters."
-                : "No announcements yet. Create an announcement to notify desktop app users."}
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--card)/0.5)] py-20 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--muted))]">
+            <Megaphone className="h-8 w-8 text-[hsl(var(--muted-foreground)/0.7)]" />
+          </div>
+          <h3 className="mt-4 text-base font-semibold text-[hsl(var(--foreground))]">
+            No announcements found
+          </h3>
+          <p className="mt-1.5 max-w-sm text-sm text-[hsl(var(--muted-foreground))]">
+            {search || typeFilter !== "all" || statusFilter !== "all"
+              ? "Try adjusting your search or filters."
+              : "Create an announcement to broadcast to desktop app users."}
+          </p>
+          {!(search || typeFilter !== "all" || statusFilter !== "all") && (
+            <p className="mt-3 flex items-center gap-1.5 text-xs text-[hsl(var(--muted-foreground)/0.6)]">
+              Use the
+              <span className="inline-flex items-center gap-1 rounded-md bg-[hsl(var(--primary)/0.1)] px-2 py-0.5 text-[11px] font-medium text-[hsl(var(--primary))]">
+                <Plus className="h-3 w-3" /> New Announcement
+              </span>
+              button above to get started
             </p>
-          </CardContent>
-        </Card>
+          )}
+        </div>
       ) : (
         <div className="space-y-3">
           {filtered.map((a) => (

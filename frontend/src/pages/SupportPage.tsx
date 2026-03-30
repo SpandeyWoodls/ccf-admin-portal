@@ -279,12 +279,8 @@ function TicketListItem({
     >
       {/* Row 1: Ticket number + time */}
       <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-[11px] text-[hsl(var(--muted-foreground))]">
-          {ticket.id.startsWith("tkt_")
-            ? `TKT-${ticket.id.replace("tkt_", "").padStart(5, "0")}`
-            : ticket.id.length < 10
-              ? ticket.id
-              : ticket.id.slice(0, 8)}
+        <span className="font-mono text-[11px] font-semibold text-[hsl(var(--foreground)/0.7)]">
+          {ticket.ticketNumber || ticket.id.slice(0, 8)}
         </span>
         <span className="shrink-0 text-[10px] text-[hsl(var(--muted-foreground)/0.7)]">
           {relativeTime(ticket.updatedAt)}
@@ -299,20 +295,20 @@ function TicketListItem({
       {/* Row 3: Badges + org */}
       <div className="flex flex-wrap items-center gap-1.5">
         <Badge
-          variant="outline"
-          className={cn("text-[10px] px-1.5 py-0 leading-tight", cat.className)}
+          variant="secondary"
+          className="text-[10px] px-1.5 py-0 leading-tight font-medium bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] border-transparent"
         >
           {cat.label}
         </Badge>
         <Badge
-          variant="outline"
-          className={cn("text-[10px] px-1.5 py-0 leading-tight", pri.className)}
+          variant="secondary"
+          className="text-[10px] px-1.5 py-0 leading-tight font-medium bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] border-transparent"
         >
           {pri.label}
         </Badge>
         <Badge
-          variant={sta.variant}
-          className="text-[10px] px-1.5 py-0 leading-tight"
+          variant="secondary"
+          className="text-[10px] px-1.5 py-0 leading-tight font-medium bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] border-transparent"
         >
           {sta.label}
         </Badge>
@@ -458,6 +454,7 @@ export function SupportPage() {
       const q = search.toLowerCase();
       return (
         t.id.toLowerCase().includes(q) ||
+        (t.ticketNumber ?? "").toLowerCase().includes(q) ||
         t.subject.toLowerCase().includes(q) ||
         (t.organization?.name ?? "").toLowerCase().includes(q) ||
         t.requesterName.toLowerCase().includes(q)
@@ -676,12 +673,8 @@ export function SupportPage() {
                     <div className="min-w-0 flex-1">
                       {/* Badges row */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-[11px] text-[hsl(var(--muted-foreground))]">
-                          {selectedTicket.id.startsWith("tkt_")
-                            ? `TKT-${selectedTicket.id.replace("tkt_", "").padStart(5, "0")}`
-                            : selectedTicket.id.length < 10
-                              ? selectedTicket.id
-                              : selectedTicket.id.slice(0, 8)}
+                        <span className="font-mono text-[11px] font-semibold text-[hsl(var(--foreground)/0.7)]">
+                          {selectedTicket.ticketNumber || selectedTicket.id.slice(0, 8)}
                         </span>
                         <Badge
                           variant={
