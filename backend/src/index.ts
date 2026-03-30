@@ -43,6 +43,7 @@ import announcementAdminRoutes from "./routes/announcement.admin.routes.js";
 import rolloutAdminRoutes from "./routes/rollout.admin.routes.js";
 import bulkAdminRoutes from "./routes/bulk.admin.routes.js";
 import downloadAdminRoutes, { publicDownloadHandler } from "./routes/download.routes.js";
+import releaseWizardRoutes from "./routes/release-wizard.routes.js";
 import webhookRoutes from "./routes/webhook.routes.js";
 import { startCronJobs } from "./cron/index.js";
 
@@ -150,6 +151,7 @@ app.use("/api/v1/admin/announcements", adminLimiter, announcementAdminRoutes);
 app.use("/api/v1/admin/downloads", adminLimiter, downloadAdminRoutes);
 app.use("/api/v1/admin", adminLimiter, rolloutAdminRoutes);
 app.use("/api/v1/admin/bulk", adminLimiter, bulkAdminRoutes);
+app.use("/api/v1/admin/release-wizard", adminLimiter, releaseWizardRoutes);
 
 // ─── Public authenticated download route ────────────────────────────────────
 // Requires either X-License-Key header or admin JWT Bearer token.

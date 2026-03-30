@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -8,6 +9,7 @@ import {
   Package,
   Download,
   Eye,
+  Wand2,
   ShieldBan,
   Rocket,
   ChevronDown,
@@ -1027,6 +1029,7 @@ function CreateReleaseDialog({
 // ---------------------------------------------------------------------------
 
 export function ReleasesPage() {
+  const navigate = useNavigate();
   const {
     releases: storeReleases,
     isLoading,
@@ -1142,10 +1145,16 @@ export function ReleasesPage() {
           </p>
         </div>
         <RoleGuard permission="releases.create">
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4" />
-            New Release
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => navigate("/release-wizard")}>
+              <Wand2 className="h-4 w-4" />
+              Release Wizard
+            </Button>
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4" />
+              New Release
+            </Button>
+          </div>
         </RoleGuard>
       </div>
 

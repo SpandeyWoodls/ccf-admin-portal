@@ -14,6 +14,7 @@ const LicenseDetailPage = lazy(() => import("./pages/LicenseDetailPage").then(m 
 const OrganizationsPage = lazy(() => import("./pages/OrganizationsPage").then(m => ({ default: m.OrganizationsPage })));
 const OrgDetailPage = lazy(() => import("./pages/OrgDetailPage").then(m => ({ default: m.OrgDetailPage })));
 const ReleasesPage = lazy(() => import("./pages/ReleasesPage").then(m => ({ default: m.ReleasesPage })));
+const ReleaseWizardPage = lazy(() => import("./pages/ReleaseWizardPage").then(m => ({ default: m.ReleaseWizardPage })));
 const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage").then(m => ({ default: m.AnalyticsPage })));
 const AnnouncementsPage = lazy(() => import("./pages/AnnouncementsPage").then(m => ({ default: m.AnnouncementsPage })));
 const SupportPage = lazy(() => import("./pages/SupportPage").then(m => ({ default: m.SupportPage })));
@@ -38,6 +39,7 @@ function App() {
           <Route path="/organizations" element={<OrganizationsPage />} />
           <Route path="/organizations/:id" element={<OrgDetailPage />} />
           <Route path="/releases" element={<ReleasesPage />} />
+          <Route path="/release-wizard" element={<ReleaseWizardPage />} />
           <Route path="/downloads" element={<DownloadsPage />} />
           <Route path="/analytics" element={
             <RoleGuard permission="analytics.view" fallback={<AccessDenied />}>
