@@ -88,33 +88,33 @@ export function LoginPage() {
 
           {/* Hero text */}
           <h1 className="text-5xl xl:text-6xl font-bold leading-[1.1] text-gray-900 mb-6">
-            Professional
+            License &
             <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-blue-600">
-              Mobile Forensics
+              Distribution
             </span>
             <br />
-            Suite
+            Portal
           </h1>
 
           <p className="text-gray-500 text-lg mb-10 max-w-lg leading-relaxed">
-            Enterprise-grade digital evidence acquisition and analysis platform
-            for law enforcement professionals.
+            Centralized management for licenses, customers, software releases,
+            and real-time usage analytics.
           </p>
 
           {/* Feature bullets */}
           <div className="space-y-5">
             <FeatureBullet
               icon={<Shield className="h-4 w-4" />}
-              text="Court-admissible evidence with SHA-256 integrity"
+              text="Manage licenses, activations, and customer organizations"
             />
             <FeatureBullet
               icon={<Search className="h-4 w-4" />}
-              text="Automated artifact discovery across 30+ data sources"
+              text="Track usage analytics, heartbeats, and version adoption"
             />
             <FeatureBullet
               icon={<Lock className="h-4 w-4" />}
-              text="Tamper-proof audit trail with chain of custody"
+              text="Secure software distribution with staged rollouts"
             />
           </div>
         </div>
