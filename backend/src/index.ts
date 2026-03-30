@@ -1,5 +1,11 @@
 import dotenv from "dotenv";
-dotenv.config({ path: ".env" }); // Silently ignored if .env doesn't exist
+import { fileURLToPath as _fu } from "url";
+import { dirname as _dn, resolve as _rs } from "path";
+const _df = _dn(_fu(import.meta.url));
+// Try multiple .env locations
+dotenv.config({ path: _rs(_df, "../.env") });       // backend/.env
+dotenv.config({ path: _rs(_df, "../../.env") });     // root .env
+dotenv.config({ path: ".env" });                      // cwd .env
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
