@@ -80,7 +80,7 @@ const triggerBuildSchema = z.object({
   channel: z.enum(["stable", "beta", "rc"]).default("stable"),
   releaseNotes: z.string().optional().nullable(),
   workflowFileName: z.string().default("release.yml"),
-  ref: z.string().default("main"),
+  ref: z.string().default("windows-port"),
 });
 
 const importAssetsSchema = z.object({
