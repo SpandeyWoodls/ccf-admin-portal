@@ -517,12 +517,14 @@ function StepBuild({
   version,
   channel,
   buildId,
+  releaseNotes,
   onBuildStarted,
   onNext,
   onCancel,
 }: {
   version: string;
   channel: Channel;
+  releaseNotes: string;
   buildId: string | null;
   onBuildStarted: (id: string) => void;
   onNext: () => void;
@@ -1190,6 +1192,7 @@ export function ReleaseWizardPage() {
             <StepBuild
               version={version}
               channel={channel}
+              releaseNotes={releaseNotes}
               buildId={buildId}
               onBuildStarted={handleBuildStarted}
               onNext={handleStep2Next}
