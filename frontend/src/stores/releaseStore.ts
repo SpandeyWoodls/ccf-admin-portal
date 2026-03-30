@@ -28,6 +28,7 @@ export interface Release {
   isBlocked: boolean;
   publishedAt: string | null;
   createdAt: string;
+  assets?: ReleaseAsset[];
   _count?: { assets: number; downloads: number };
 }
 

@@ -1376,7 +1376,7 @@ export function ReleasesPage() {
       storeReleases.map((r) => ({
         ...r,
         releaseNotes: r.releaseNotes || "",
-        assets: [],
+        assets: r.assets ?? [],
         minVersion: null,
         blockReason: null,
         _count: { downloads: r._count?.downloads ?? 0 },
