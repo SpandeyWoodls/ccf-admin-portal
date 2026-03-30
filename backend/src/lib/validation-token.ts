@@ -11,17 +11,21 @@ export function generateValidationToken(
   licenseKey: string,
   hardwareFingerprint: string,
   validatedAt: string,
-  expiresAt: string,
+  expiresAt: string | null,
 ): string {
   const secret = process.env.CCF_HMAC_SECRET || "";
-  const data = `${licenseKey}:${hardwareFingerprint}:${validatedAt}:${expiresAt}`;
+  // When expires_at is null/empty (perpetual license), use "perpetual" in signing data
+  // to match Rust's: token_data.expires_at.as_deref().unwrap_or("perpetual")
+  const expiresForSigning = expiresAt || "perpetual";
+  const data = `${licenseKey}:${hardwareFingerprint}:${validatedAt}:${expiresForSigning}`;
   const signature = crypto.createHmac("sha256", secret).update(data).digest("hex");
 
   const token = {
     license_key: licenseKey,
     hardware_fingerprint: hardwareFingerprint,
     validated_at: validatedAt,
-    expires_at: expiresAt,
+    // Send null (not "") for perpetual licenses so Rust deserializes as None
+    expires_at: expiresAt || null,
     signature: signature,
   };
 

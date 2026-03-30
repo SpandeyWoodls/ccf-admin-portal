@@ -165,7 +165,7 @@ router.post("/activate", async (req: Request, res: Response, next: NextFunction)
       if (existingActivation) {
         // Already activated - update and return success
         const existingValidatedAt = new Date().toISOString();
-        const existingExpiresAt = license.validUntil?.toISOString() ?? "";
+        const existingExpiresAt = license.validUntil?.toISOString() ?? null;
         const existingHmacToken = generateValidationToken(
           body.license_key,
           body.hardware_fingerprint,
@@ -204,7 +204,7 @@ router.post("/activate", async (req: Request, res: Response, next: NextFunction)
 
       // Generate HMAC validation token for offline validation
       const activateValidatedAt = new Date().toISOString();
-      const activateExpiresAt = license.validUntil?.toISOString() ?? "";
+      const activateExpiresAt = license.validUntil?.toISOString() ?? null;
       const activateHmacToken = generateValidationToken(
         body.license_key,
         body.hardware_fingerprint,
@@ -379,7 +379,7 @@ router.post("/validate", async (req: Request, res: Response, next: NextFunction)
 
     // Generate fresh HMAC validation token on each validation
     const validateValidatedAt = new Date().toISOString();
-    const validateExpiresAt = license.validUntil?.toISOString() ?? "";
+    const validateExpiresAt = license.validUntil?.toISOString() ?? null;
     const validateHmacToken = generateValidationToken(
       body.license_key,
       body.hardware_fingerprint,

@@ -318,6 +318,7 @@ model Release {
   title         String          @db.VarChar(255)
   releaseNotes  String?         @map("release_notes") @db.Text
   gitCommitSha  String?         @map("git_commit_sha") @db.VarChar(64)
+  workflowRunId BigInt?         @map("workflow_run_id")
   minVersion    String?         @map("min_version") @db.VarChar(30)
   forceUpdate   Boolean         @default(false) @map("force_update")
   isBlocked     Boolean         @default(false) @map("is_blocked")

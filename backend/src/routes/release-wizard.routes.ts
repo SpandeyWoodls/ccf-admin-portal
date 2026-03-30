@@ -85,7 +85,7 @@ const triggerBuildSchema = z.object({
 
 const importAssetsSchema = z.object({
   releaseId: z.string().uuid(),
-  githubReleaseId: z.number().int().positive(),
+  githubReleaseId: z.number().int().positive().optional(),
 });
 
 // ─── POST /trigger-build ───────────────────────────────────────────────────
@@ -133,6 +133,7 @@ router.post(
           inputs: {
             version: body.version,
             channel: body.channel,
+            release_notes: body.releaseNotes ?? "",
           },
         }),
       });
@@ -154,19 +155,25 @@ router.post(
       let workflowRunId: number | null = null;
       try {
         // Small delay to let GitHub register the run
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await new Promise((resolve) => setTimeout(resolve, 3000));
 
         const runsResponse = await githubFetch(
           `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/${body.workflowFileName}/runs?per_page=5&event=workflow_dispatch`,
         );
 
         if (runsResponse?.workflow_runs?.length > 0) {
-          // Find the most recent run that is in_progress or queued
+          const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+          // Find the most recent workflow_dispatch run created in the last 5 minutes
           const recentRun = runsResponse.workflow_runs.find(
-            (run: any) => run.status === "queued" || run.status === "in_progress",
+            (run: any) => run.event === "workflow_dispatch" && run.created_at >= fiveMinutesAgo,
           );
           if (recentRun) {
             workflowRunId = recentRun.id;
+            // Persist the run ID to the Release record for future lookups
+            await prisma.release.update({
+              where: { id: release.id },
+              data: { workflowRunId: BigInt(workflowRunId) },
+            });
           }
         }
       } catch {
@@ -432,7 +439,7 @@ router.get(
 // Fetches assets from a GitHub Release and creates ReleaseAsset records
 // in our database, linking them to an existing draft Release.
 //
-// Body: { releaseId, githubReleaseId }
+// Body: { releaseId, githubReleaseId? }
 
 router.post(
   "/import-assets",
@@ -458,7 +465,35 @@ router.post(
         );
       }
 
-      // 2. Fetch the GitHub Release by ID
+      // 2a. If githubReleaseId not provided, look up by version tag
+      if (!body.githubReleaseId) {
+        const tag = `v${release.version}`;
+        let ghByTag: any = null;
+        try {
+          ghByTag = await githubFetch(
+            `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tags/${tag}`,
+          );
+        } catch {
+          // Try without "v" prefix as fallback
+          try {
+            ghByTag = await githubFetch(
+              `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tags/${release.version}`,
+            );
+          } catch {
+            // Neither tag format found
+          }
+        }
+        if (!ghByTag) {
+          throw new AppError(
+            404,
+            `No GitHub Release found for tag "${tag}". Use the Release Wizard to trigger a build first.`,
+            "GITHUB_RELEASE_NOT_FOUND",
+          );
+        }
+        body.githubReleaseId = ghByTag.id;
+      }
+
+      // 2b. Fetch the GitHub Release by ID
       const ghRelease = await githubFetch(
         `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/${body.githubReleaseId}`,
       );
