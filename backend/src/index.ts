@@ -1,11 +1,15 @@
 import dotenv from "dotenv";
 import { fileURLToPath as _fu } from "url";
 import { dirname as _dn, resolve as _rs } from "path";
+import { existsSync as _ex } from "fs";
 const _df = _dn(_fu(import.meta.url));
-// Try multiple .env locations
+// Try multiple .env locations (first match wins per-variable via dotenv precedence)
 dotenv.config({ path: _rs(_df, "../.env") });       // backend/.env
 dotenv.config({ path: _rs(_df, "../../.env") });     // root .env
 dotenv.config({ path: ".env" });                      // cwd .env
+// Hostinger deployment: .builds/config/.env holds hPanel-configured env vars
+const _hp = _rs(_df, "../../../public_html/.builds/config/.env");
+if (_ex(_hp)) dotenv.config({ path: _hp });
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
