@@ -544,12 +544,13 @@ function StepBuild({
     let cancelled = false;
     async function startBuild() {
       try {
-        const res = await apiPost<{ buildId: string }>("/api/v1/admin/release-wizard/start-build", {
+        const res = await apiPost<{ releaseId: string; buildId?: string }>("/api/v1/admin/release-wizard/trigger-build", {
           version,
           channel,
+          releaseNotes,
         });
         if (!cancelled) {
-          onBuildStarted(res.buildId);
+          onBuildStarted(res.releaseId || res.buildId || "");
         }
       } catch (err) {
         if (!cancelled) {
@@ -570,7 +571,7 @@ function StepBuild({
     async function fetchStatus() {
       try {
         const res = await apiGet<BuildStatusResponse>(
-          `/api/v1/admin/release-wizard/build-status?buildId=${buildId}`
+          `/api/v1/admin/release-wizard/build-status?releaseId=${buildId}`
         );
         setBuildStatus(res);
         setLogs(res.logs || []);
@@ -1119,8 +1120,8 @@ export function ReleaseWizardPage() {
     }) => {
       setIsPublishing(true);
       try {
-        await apiPost("/api/v1/admin/release-wizard/publish", {
-          buildId,
+        await apiPost(`/api/v1/admin/releases/${buildId}/publish`, {
+          releaseId: buildId,
           version,
           channel,
           releaseNotes,
