@@ -594,7 +594,7 @@ export function SupportPage() {
       {hasNoTickets ? (
         <Card
           className="flex items-center justify-center"
-          style={{ height: "calc(100vh - 200px)", minHeight: "450px" }}
+          style={{ height: "calc(100vh - 155px)", minHeight: "450px" }}
         >
           <NoTicketsState />
         </Card>
@@ -602,7 +602,7 @@ export function SupportPage() {
         /* Split View */
         <div
           className="flex gap-4"
-          style={{ height: "calc(100vh - 300px)", minHeight: "500px" }}
+          style={{ height: "calc(100vh - 155px)", minHeight: "500px" }}
         >
           {/* ==================== LEFT PANEL: Ticket List ==================== */}
           <Card className="flex w-[38%] shrink-0 flex-col overflow-hidden">
