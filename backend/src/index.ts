@@ -94,7 +94,7 @@ app.use(
     origin: process.env.CORS_ORIGIN?.split(",").map((s) => s.trim()) || "http://localhost:5173",
     credentials: true,
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-License-Key", "X-Hardware-Fingerprint"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-License-Key", "X-Hardware-Fingerprint", "X-App-Channel"],
   }),
 );
 
