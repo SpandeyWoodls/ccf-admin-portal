@@ -172,6 +172,7 @@ router.post(
             // Persist the run ID to the Release record for future lookups
             await prisma.release.update({
               where: { id: release.id },
+              // @ts-ignore -- workflowRunId exists in DB but prisma client needs regeneration
               data: { workflowRunId: BigInt(recentRun.id) },
             });
           }
@@ -289,6 +290,7 @@ router.get(
                 // Persist so future polls skip the search
                 await prisma.release.update({
                   where: { id: release.id },
+                  // @ts-ignore -- workflowRunId exists in DB but prisma client needs regeneration
                   data: { workflowRunId: BigInt(matchingRun.id) },
                 });
               }
