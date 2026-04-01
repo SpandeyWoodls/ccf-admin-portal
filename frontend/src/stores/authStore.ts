@@ -44,7 +44,7 @@ export const useAuthStore = create<AuthState>()(
             (import.meta.env.VITE_API_URL || '') + '/api/v1/auth/login',
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
               body: JSON.stringify({ email, password }),
             }
           );
@@ -117,7 +117,7 @@ export const useAuthStore = create<AuthState>()(
             (import.meta.env.VITE_API_URL || '') + '/api/v1/auth/mfa/verify',
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
               body: JSON.stringify({ mfaSessionId, token }),
             }
           );
@@ -188,7 +188,7 @@ export const useAuthStore = create<AuthState>()(
             (import.meta.env.VITE_API_URL || '') + '/api/v1/auth/refresh',
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
               body: JSON.stringify({ refreshToken }),
             }
           );
