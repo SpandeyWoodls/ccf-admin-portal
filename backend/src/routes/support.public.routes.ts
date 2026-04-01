@@ -74,7 +74,7 @@ router.post("/create-ticket", async (req: Request, res: Response, next: NextFunc
     const messageText = body.message || body.description || body.subject;
     const senderName = body.sender_name || "User";
     const priority = body.priority === "urgent" ? "critical" : body.priority;
-    const category = (body.category === "technical" || body.category === "billing" || body.category === "license") ? "other" : body.category;
+    const category = (body.category === "technical" || body.category === "billing" || body.category === "license" || body.category === "general") ? "other" : body.category;
 
     const ticket = await prisma.supportTicket.create({
       data: {

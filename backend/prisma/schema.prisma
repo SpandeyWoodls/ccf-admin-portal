@@ -96,6 +96,10 @@ enum TicketCategory {
   feature
   question
   other
+  technical
+  billing
+  license
+  general
 }
 
 enum TicketPriority {
