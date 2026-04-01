@@ -18,7 +18,7 @@ const createTicketSchema = z.object({
   subject: z.string().min(1).max(512),
   message: z.string().min(1).max(10_000).optional(),
   description: z.string().min(1).max(10_000).optional(),
-  category: z.enum(["bug", "feature", "question", "other", "technical", "billing", "license"]).default("other"),
+  category: z.enum(["bug", "feature", "question", "other", "technical", "billing", "license", "general"]).default("other"),
   priority: z.enum(["low", "medium", "high", "critical", "urgent"]).default("medium"),
   sender_name: z.string().min(1).max(255).optional(),
   sender_email: z.string().email().max(320).optional(),
