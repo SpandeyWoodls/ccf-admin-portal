@@ -23,6 +23,56 @@ function getToken(): string | null {
   return null;
 }
 
+function getRefreshToken(): string | null {
+  try {
+    const stored = localStorage.getItem("ccf-auth");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return parsed?.state?.refreshToken ?? null;
+    }
+  } catch {}
+  return null;
+}
+
+let isRefreshing = false;
+
+async function tryRefreshToken(): Promise<boolean> {
+  if (isRefreshing) return false;
+  const refreshToken = getRefreshToken();
+  if (!refreshToken || refreshToken.startsWith("mock_")) return false;
+
+  isRefreshing = true;
+  try {
+    const res = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!res.ok) return false;
+
+    const json = await res.json();
+    const data = json.data ?? json;
+
+    // Update stored tokens
+    const stored = localStorage.getItem("ccf-auth");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      parsed.state.token = data.accessToken ?? data.token;
+      parsed.state.refreshToken = data.refreshToken;
+      localStorage.setItem("ccf-auth", JSON.stringify(parsed));
+    }
+    return true;
+  } catch {
+    return false;
+  } finally {
+    isRefreshing = false;
+  }
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -32,6 +82,7 @@ async function request<T>(
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    "X-Requested-With": "XMLHttpRequest",
   };
 
   if (token) {
@@ -45,6 +96,31 @@ async function request<T>(
   });
 
   if (res.status === 401) {
+    // Try token refresh before logging out
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      // Retry original request with new token
+      const newToken = getToken();
+      if (newToken) headers["Authorization"] = `Bearer ${newToken}`;
+      const retryRes = await fetch(`${BASE_URL}${path}`, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (retryRes.ok || retryRes.status !== 401) {
+        // Process retry response through the same logic below
+        if (retryRes.status === 204) return undefined as T;
+        if (!retryRes.ok) {
+          const errorBody = await retryRes.json().catch(() => ({}));
+          throw new ApiError(retryRes.status, errorBody.message || `Request failed with status ${retryRes.status}`);
+        }
+        const json = await retryRes.json();
+        if (json !== null && typeof json === "object" && "success" in json && "data" in json) {
+          return json.data as T;
+        }
+        return json as T;
+      }
+    }
     localStorage.removeItem("ccf-auth");
     window.location.href = "/login";
     throw new ApiError(401, "Unauthorized");

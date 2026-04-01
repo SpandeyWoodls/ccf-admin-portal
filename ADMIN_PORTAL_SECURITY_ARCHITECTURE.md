@@ -56,7 +56,7 @@ GitHub Releases (artifact storage)
     |
     | Admin uploads release metadata
     v
-Admin Portal (admin.cyberchakra.in)
+Admin Portal (cyberchakra.online)
     |
     | Desktop app checks /api/v1/update-check
     v
@@ -73,7 +73,7 @@ Installed Binary (law enforcement machine)
 |---|----------|----------|--------|------------|-------------------|
 | T1 | **GitHub compromise** -- attacker gains write access to repo | External (stolen PAT/SSH key) or insider | Can push malicious code that CI builds and signs | Medium | Branch protection, PR reviews |
 | T2 | **Admin portal compromise** -- attacker gains admin access | External (credential stuffing, phishing) | Can modify update-check response to point to malicious URL | Medium | JWT auth, but **no MFA yet** |
-| T3 | **DNS hijack** -- attacker redirects `admin.cyberchakra.in` | State-level or ISP-level | MITM the update-check endpoint, serve malicious binary | Low | TLS, but **no certificate pinning** |
+| T3 | **DNS hijack** -- attacker redirects `cyberchakra.online` | State-level or ISP-level | MITM the update-check endpoint, serve malicious binary | Low | TLS, but **no certificate pinning** |
 | T4 | **Developer machine compromise** -- supply chain via dev laptop | External (malware, phishing) | Push malicious commits, steal signing keys if stored locally | Medium | None currently |
 | T5 | **Signing key theft** -- `TAURI_SIGNING_PRIVATE_KEY` stolen from GitHub Secrets | GitHub breach or social engineering | Sign arbitrary malicious binaries that pass client verification | Low | Key is in GitHub Secrets (good) |
 | T6 | **MITM on update endpoint** -- intercept HTTP(S) traffic | Network-level (police network, ISP) | Serve modified update-check JSON pointing to malicious binary | Low | HTTPS is used, but no pinning |
@@ -296,7 +296,7 @@ router.post("/:id/approve-publish", requireRole("admin", "super_admin"), async (
 
 #### 4.5 Certificate Pinning for Update Endpoint
 
-**Why:** TLS protects the update-check endpoint, but if an attacker compromises a certificate authority (or obtains a fraudulent certificate for `admin.cyberchakra.in`), they can MITM the connection. For forensic software used by law enforcement, this is a realistic threat (state-level attackers).
+**Why:** TLS protects the update-check endpoint, but if an attacker compromises a certificate authority (or obtains a fraudulent certificate for `cyberchakra.online`), they can MITM the connection. For forensic software used by law enforcement, this is a realistic threat (state-level attackers).
 
 **Implementation:** See [Section 7](#7-certificate-pinning) for full details.
 
@@ -675,9 +675,9 @@ This is not theoretical. Defense attorneys in digital forensics cases have succe
 
 ### 7.1 What and Why
 
-Certificate pinning means the desktop app only trusts a specific TLS certificate (or public key) for `admin.cyberchakra.in`, rather than trusting any certificate signed by any CA in the system trust store.
+Certificate pinning means the desktop app only trusts a specific TLS certificate (or public key) for `cyberchakra.online`, rather than trusting any certificate signed by any CA in the system trust store.
 
-**Without pinning:** An attacker who obtains a fraudulent certificate for `admin.cyberchakra.in` (via CA compromise, social engineering, or a state-level actor) can MITM the update-check endpoint.
+**Without pinning:** An attacker who obtains a fraudulent certificate for `cyberchakra.online` (via CA compromise, social engineering, or a state-level actor) can MITM the update-check endpoint.
 
 **With pinning:** Even with a valid certificate from a legitimate CA, the MITM fails because the certificate's public key doesn't match the pinned key.
 
@@ -1004,7 +1004,7 @@ STEPS:
 |--------------------------|---------------------|----------------|
 | GitHub repo (write access) | Push malicious code, trigger CI build, sign binary | N/A -- this is a full compromise |
 | Admin portal | Modify update URLs, block versions, access data | Sign binaries, bypass client signature check |
-| DNS for admin.cyberchakra.in | Redirect update checks | Forge minisign signatures, break pinned TLS |
+| DNS for cyberchakra.online | Redirect update checks | Forge minisign signatures, break pinned TLS |
 | Developer laptop | Push code (if GitHub access), leak SSH keys | Access GitHub Secrets (signing keys) |
 | TAURI_SIGNING_PRIVATE_KEY | Sign arbitrary binaries | Nothing -- this is a full compromise of the update chain |
 | TLS certificate authority | Issue fake cert for MITM | Bypass certificate pinning (if implemented), forge signatures |

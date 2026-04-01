@@ -53,17 +53,32 @@ interface BackendPaginatedResponse<T> {
 
 // No mock data -- stores return empty arrays on API failure
 
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+const DEFAULT_PAGINATION: Pagination = {
+  page: 1,
+  limit: 20,
+  total: 0,
+  totalPages: 0,
+};
+
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
 interface ReleaseState {
   releases: Release[];
+  pagination: Pagination;
   selectedRelease: ReleaseDetail | null;
   isLoading: boolean;
   error: string | null;
 
-  fetchReleases: () => Promise<void>;
+  fetchReleases: (params?: { page?: number; pageSize?: number }) => Promise<void>;
   fetchRelease: (id: string) => Promise<void>;
   createRelease: (data: Record<string, unknown>) => Promise<Release>;
   publishRelease: (id: string, force?: boolean) => Promise<void>;
@@ -77,17 +92,28 @@ interface ReleaseState {
 
 export const useReleaseStore = create<ReleaseState>()((set, get) => ({
   releases: [],
+  pagination: { ...DEFAULT_PAGINATION },
   selectedRelease: null,
   isLoading: false,
   error: null,
 
-  fetchReleases: async () => {
+  fetchReleases: async (params?: { page?: number; pageSize?: number }) => {
     set({ isLoading: true, error: null });
     try {
+      const qp = new URLSearchParams();
+      if (params?.page) qp.set("page", String(params.page));
+      if (params?.pageSize) qp.set("pageSize", String(params.pageSize));
+      const qs = qp.toString();
       const raw = await apiGet<BackendPaginatedResponse<Release>>(
-        "/api/v1/admin/releases",
+        `/api/v1/admin/releases${qs ? `?${qs}` : ""}`,
       );
-      set({ releases: raw.items, isLoading: false });
+      set({
+        releases: Array.isArray(raw?.items) ? raw.items : [],
+        pagination: raw
+          ? { page: raw.page, limit: raw.pageSize, total: raw.total, totalPages: raw.totalPages }
+          : { ...DEFAULT_PAGINATION },
+        isLoading: false,
+      });
     } catch (err) {
       set({
         releases: [],
@@ -263,3 +289,6 @@ export const useSelectedRelease = () =>
 
 export const useReleaseLoading = () =>
   useReleaseStore((s) => s.isLoading);
+
+export const useReleasePagination = () =>
+  useReleaseStore((s) => s.pagination);

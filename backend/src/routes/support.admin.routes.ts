@@ -6,6 +6,8 @@ import { AppError } from "../middleware/errorHandler.js";
 import { logAudit } from "../lib/audit.js";
 import { paginated } from "../lib/response.js";
 import { parsePagination } from "../lib/pagination.js";
+import { sendEmail } from "../services/email.js";
+import { ticketReplyNotificationEmail } from "../services/email-templates.js";
 
 const router = Router();
 
@@ -15,7 +17,7 @@ router.use(requireAuth);
 // ─── Schemas ────────────────────────────────────────────────────────────────
 
 const replySchema = z.object({
-  message: z.string().min(1),
+  message: z.string().min(1).max(10_000),
   isInternal: z.boolean().optional().default(false),
 });
 
@@ -24,6 +26,12 @@ const updateTicketSchema = z.object({
   priority: z.enum(["low", "medium", "high", "critical"]).optional(),
   category: z.enum(["bug", "feature", "question", "other"]).optional(),
 });
+
+const assignSchema = z.object({
+  adminId: z.string().uuid("Invalid admin ID format"),
+});
+
+const uuidSchema = z.string().uuid("Invalid UUID format");
 
 // ─── GET / (list all tickets) ───────────────────────────────────────────────
 
@@ -108,6 +116,7 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
         organization: { select: { id: true, name: true, slug: true } },
         messages: {
           orderBy: { createdAt: "asc" },
+          take: 500,
         },
       },
     });
@@ -177,6 +186,35 @@ router.post(
         ipAddress: req.ip ?? null,
         userAgent: req.headers["user-agent"] ?? null,
       });
+
+      // Fire-and-forget: notify the user about admin reply (skip for internal notes)
+      if (!body.isInternal) {
+        // Look for user email: check the first user message's senderName or find an activation email
+        const userMessage = await prisma.ticketMessage.findFirst({
+          where: { ticketId: ticket.id, senderType: "user" },
+          orderBy: { createdAt: "asc" },
+          select: { senderName: true },
+        });
+
+        // Try to find user's email from the license activation or support context
+        const activation = ticket.licenseKey
+          ? await prisma.licenseActivation.findFirst({
+              where: { license: { licenseKey: ticket.licenseKey }, isActive: true, userEmail: { not: null } },
+              select: { userEmail: true },
+            })
+          : null;
+
+        const recipientEmail = activation?.userEmail;
+        if (recipientEmail) {
+          const { subject: replySubject, html: replyHtml } = ticketReplyNotificationEmail(
+            ticket.ticketNumber,
+            body.message,
+          );
+          sendEmail(recipientEmail, replySubject, replyHtml).catch(err =>
+            console.error("[Email] Ticket reply notification failed:", err.message),
+          );
+        }
+      }
 
       res.status(201).json({
         success: true,
@@ -301,6 +339,54 @@ router.patch(
         data: updated,
         error: null,
         message: "Ticket updated",
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── POST /:id/assign (assign ticket to admin) ────────────────────────────
+
+router.post(
+  "/:id/assign",
+  requireRole("admin", "super_admin", "support"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = assignSchema.parse(req.body);
+
+      const ticket = await prisma.supportTicket.findUnique({
+        where: { id: req.params.id as string },
+      });
+
+      if (!ticket) {
+        throw new AppError(404, "Ticket not found", "NOT_FOUND");
+      }
+
+      const updated = await prisma.supportTicket.update({
+        where: { id: req.params.id as string },
+        data: { assignedToId: body.adminId },
+        include: {
+          organization: { select: { id: true, name: true, slug: true } },
+        },
+      });
+
+      await logAudit({
+        adminUserId: req.admin!.id,
+        action: "assign_ticket",
+        resourceType: "support_ticket",
+        resourceId: ticket.id,
+        oldValues: { assignedToId: ticket.assignedToId },
+        newValues: { assignedToId: body.adminId },
+        ipAddress: req.ip ?? null,
+        userAgent: req.headers["user-agent"] ?? null,
+      });
+
+      res.json({
+        success: true,
+        data: updated,
+        error: null,
+        message: "Ticket assigned",
       });
     } catch (err) {
       next(err);

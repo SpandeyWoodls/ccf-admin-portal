@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This document proposes the architecture, design, and implementation roadmap for a **cloud-hosted Admin Portal** for Cyber Chakra Forensics (CMF). The portal will replace the existing PHP license server at `license.cyberchakra.in` with a modern, full-featured admin dashboard that manages licenses, customers, analytics, software distribution, and support.
+This document proposes the architecture, design, and implementation roadmap for a **cloud-hosted Admin Portal** for Cyber Chakra Forensics (CMF). The portal will replace the existing PHP license server at `cyberchakra.online` with a modern, full-featured admin dashboard that manages licenses, customers, analytics, software distribution, and support.
 
 **The portal serves two audiences:**
 1. **CMF Company Admins** -- Dashboard to manage licenses, customers, analytics, releases, and support
@@ -29,13 +29,13 @@ A **production-grade desktop forensics application** built with Tauri v2 (Rust +
 ### Existing License Infrastructure
 | Component | Current State |
 |-----------|--------------|
-| License Server | PHP at `https://license.cyberchakra.in/api` |
+| License Server | PHP at `https://cyberchakra.online/api` |
 | Key Format | `CCF-XXXX-XXXX-XXXX-XXXX` (HMAC-SHA256 checksum) |
 | Activation | Hardware fingerprint binding (SHA256 of machine ID + CPU + motherboard + MAC + disk) |
 | Validation | Online check every 30 days, 30-day offline grace period |
 | Heartbeat | Reports cases_created, acquisitions, reports_generated |
 | Updates | Tauri plugin updater checks `update-check.php` |
-| Downloads | `license.cyberchakra.in/portal/downloads.php` |
+| Downloads | `cyberchakra.online/portal/downloads.php` |
 
 ### What's Missing (Why We Need the Portal)
 - No unified admin dashboard (admin features scattered across Settings tabs)
@@ -376,7 +376,7 @@ Draw from: **Vercel** (clean metrics), **Linear** (fast keyboard-first UX), **St
 
 ### API Security
 - Rate limiting: 60 requests/hour per license key, 10/hour per unauthenticated IP
-- CORS: Only allow `admin.cyberchakra.in` origin
+- CORS: Only allow `cyberchakra.online` origin
 - Input validation: Zod schemas on all endpoints
 - Short-lived download tokens (5-min signed JWTs)
 - Binary integrity: SHA-256 at upload, re-computed server-side (never trust client hash)
@@ -554,7 +554,7 @@ The admin portal can be deployed with **zero desktop app changes** initially (ng
 | Neon | Launch ($19/mo) | $19/mo |
 | Clerk | Pro ($25/mo for 1000 MAU) | $25/mo |
 | Vercel KV (Redis) | Hobby (included) | $0/mo |
-| Domain (admin.cyberchakra.in) | Already owned | $0/mo |
+| Domain (cyberchakra.online) | Already owned | $0/mo |
 | **Total** | | **~$64/mo (~5,300 INR/mo)** |
 
 *Scales to Pro tiers as needed. Government hosting on AWS Mumbai adds ~$50-100/mo for a small RDS instance if Neon's US data residency is a concern.*

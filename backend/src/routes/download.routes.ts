@@ -46,12 +46,13 @@ router.get(
         isBlocked: false,           // Exclude blocked releases
       };
 
-      if (req.query.channel) {
+      const validChannels = ["stable", "beta", "rc"];
+      if (req.query.channel && typeof req.query.channel === "string" && validChannels.includes(req.query.channel)) {
         where.channel = req.query.channel;
       }
 
       if (req.query.search) {
-        const search = String(req.query.search);
+        const search = String(req.query.search).slice(0, 200);
         where.OR = [
           { version: { contains: search } },
           { title: { contains: search } },

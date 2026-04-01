@@ -27,7 +27,7 @@ function requireGitHubPat(): void {
   if (!GITHUB_PAT) {
     throw new AppError(
       503,
-      "GITHUB_PAT is not configured. Set it in your .env file to enable GitHub integration.",
+      "GitHub integration is not configured. Contact the server administrator to enable it.",
       "GITHUB_PAT_MISSING",
     );
   }

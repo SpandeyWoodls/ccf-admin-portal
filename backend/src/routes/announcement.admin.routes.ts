@@ -15,21 +15,23 @@ router.use(requireAuth);
 
 const createAnnouncementSchema = z.object({
   title: z.string().min(1).max(255),
-  message: z.string().min(1),
+  message: z.string().min(1).max(5000),
   announcementType: z.enum(["info", "warning", "critical", "maintenance"]).default("info"),
-  targetOrgIds: z.array(z.string().uuid()).optional().nullable(),
-  targetTiers: z.array(z.string()).optional().nullable(),
-  targetVersions: z.array(z.string()).optional().nullable(),
-  actionUrl: z.string().url().optional().nullable(),
+  targetOrgIds: z.array(z.string().uuid()).max(100).optional().nullable(),
+  targetTiers: z.array(z.string().max(50)).max(10).optional().nullable(),
+  targetVersions: z.array(z.string().max(30)).max(20).optional().nullable(),
+  actionUrl: z.string().url().max(2000).optional().nullable(),
   actionLabel: z.string().max(100).optional().nullable(),
   dismissible: z.boolean().default(true),
-  priority: z.number().int().min(0).default(0),
+  priority: z.number().int().min(0).max(1000).default(0),
   startsAt: z.string().datetime(),
   expiresAt: z.string().datetime().optional().nullable(),
   isActive: z.boolean().default(true),
 });
 
 const updateAnnouncementSchema = createAnnouncementSchema.partial();
+
+const uuidSchema = z.string().uuid("Invalid UUID format");
 
 // ─── GET / (list announcements) ─────────────────────────────────────────────
 
@@ -74,8 +76,9 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
 
 router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const id = uuidSchema.parse(req.params.id);
     const announcement = await prisma.announcement.findUnique({
-      where: { id: req.params.id as string },
+      where: { id },
       include: {
         createdBy: { select: { id: true, name: true, email: true } },
       },
@@ -141,9 +144,10 @@ router.patch(
   requireRole("admin", "super_admin"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const id = uuidSchema.parse(req.params.id);
       const body = updateAnnouncementSchema.parse(req.body);
 
-      const existing = await prisma.announcement.findUnique({ where: { id: req.params.id as string } });
+      const existing = await prisma.announcement.findUnique({ where: { id } });
       if (!existing) throw new AppError(404, "Announcement not found", "NOT_FOUND");
 
       const updateData: any = {};
@@ -162,7 +166,7 @@ router.patch(
       if (body.isActive !== undefined) updateData.isActive = body.isActive;
 
       const updated = await prisma.announcement.update({
-        where: { id: req.params.id as string },
+        where: { id },
         data: updateData,
       });
 
@@ -191,10 +195,11 @@ router.delete(
   requireRole("admin", "super_admin"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const existing = await prisma.announcement.findUnique({ where: { id: req.params.id as string } });
+      const id = uuidSchema.parse(req.params.id);
+      const existing = await prisma.announcement.findUnique({ where: { id } });
       if (!existing) throw new AppError(404, "Announcement not found", "NOT_FOUND");
 
-      await prisma.announcement.delete({ where: { id: req.params.id as string } });
+      await prisma.announcement.delete({ where: { id } });
 
       await logAudit({
         adminUserId: req.admin!.id,

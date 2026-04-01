@@ -236,10 +236,17 @@ export function OrganizationsPage() {
 
       {/* Error banner */}
       {error && (
-        <div className="flex items-center gap-2 rounded-[var(--radius)] border border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.05)] px-4 py-3 text-sm text-[hsl(var(--destructive))]">
+        <div
+          className={`flex items-center gap-2 rounded-[var(--radius)] border px-4 py-3 text-sm ${
+            error.startsWith("Too many requests")
+              ? "border-[hsl(var(--warning,45_93%_47%)/0.3)] bg-[hsl(var(--warning,45_93%_47%)/0.05)] text-[hsl(var(--warning,45_93%_47%))]"
+              : "border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.05)] text-[hsl(var(--destructive))]"
+          }`}
+        >
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>
-            {error} &mdash; showing cached data.
+            {error}
+            {organizations.length > 0 && " — showing cached data"}
           </span>
         </div>
       )}

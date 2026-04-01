@@ -3,17 +3,19 @@ name: CI
 on:
   push:
     paths:
-      - 'docs/admin-portal/**'
+      - 'backend/**'
+      - 'frontend/**'
   pull_request:
     paths:
-      - 'docs/admin-portal/**'
+      - 'backend/**'
+      - 'frontend/**'
 
 jobs:
   lint-and-typecheck:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: docs/admin-portal
+        working-directory: .
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,8 +23,8 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: |
-            docs/admin-portal/frontend/package-lock.json
-            docs/admin-portal/backend/package-lock.json
+            ./frontend/package-lock.json
+            ./backend/package-lock.json
 
       - name: Install frontend deps
         run: cd frontend && npm ci
@@ -60,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: docs/admin-portal
+        working-directory: .
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -83,7 +85,7 @@ jobs:
     environment: staging
     defaults:
       run:
-        working-directory: docs/admin-portal
+        working-directory: .
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -100,7 +102,7 @@ jobs:
 
       - name: Build frontend (staging)
         env:
-          VITE_API_URL: "https://admin-staging.cyberchakra.in"
+          VITE_API_URL: "https://staging.cyberchakra.online"
         run: cd frontend && npm run build
 
       - name: Build backend
@@ -126,7 +128,7 @@ jobs:
           host: ${{ secrets.HOSTINGER_HOST }}
           username: ${{ secrets.HOSTINGER_USER }}
           key: ${{ secrets.HOSTINGER_SSH_KEY }}
-          source: "docs/admin-portal/deploy/*"
+          source: "./deploy/*"
           target: "/home/${{ secrets.HOSTINGER_USER }}/admin-portal-staging"
           strip_components: 4
 
@@ -141,7 +143,7 @@ jobs:
             # Apply schema changes (safe, non-destructive)
             npx prisma db push --accept-data-loss=false
             # Copy frontend to staging subdomain document root
-            cp -r ~/admin-portal-staging/public_html/* ~/domains/admin-staging.cyberchakra.in/public_html/ 2>/dev/null || true
+            cp -r ~/admin-portal-staging/public_html/* ~/domains/staging.cyberchakra.online/public_html/ 2>/dev/null || true
             # Restart staging Node.js process
             npx pm2 restart ccf-admin-staging 2>/dev/null || npx pm2 start dist/index.js --name ccf-admin-staging
             echo "Staging deployment complete at $(date)"
@@ -149,7 +151,7 @@ jobs:
       - name: Verify staging health
         run: |
           sleep 10
-          HTTP_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" https://admin-staging.cyberchakra.in/api/v1/health || echo "000")
+          HTTP_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" https://staging.cyberchakra.online/api/v1/health || echo "000")
           if [ "$HTTP_STATUS" = "200" ]; then
             echo "Staging health check PASSED (HTTP 200)"
           else

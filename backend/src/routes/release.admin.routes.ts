@@ -252,10 +252,11 @@ router.post(
         userAgent: req.headers["user-agent"] ?? null,
       });
 
-      // Notify all active organizations about the new release
+      // Notify active organizations about the new release (capped to prevent DoS)
       const orgs = await prisma.organization.findMany({
         where: { isActive: true, email: { not: null } },
         select: { email: true, name: true },
+        take: 5000,
       });
       for (const org of orgs) {
         if (org.email) {

@@ -13,7 +13,13 @@ export function generateValidationToken(
   validatedAt: string,
   expiresAt: string | null,
 ): string {
-  const secret = process.env.CCF_HMAC_SECRET || "";
+  const secret = process.env.CCF_HMAC_SECRET;
+  if (!secret) {
+    throw new Error("CCF_HMAC_SECRET environment variable is required");
+  }
+  if (secret.length < 32) {
+    throw new Error("CCF_HMAC_SECRET must be at least 32 characters to match desktop app requirements");
+  }
   // When expires_at is null/empty (perpetual license), use "perpetual" in signing data
   // to match Rust's: token_data.expires_at.as_deref().unwrap_or("perpetual")
   const expiresForSigning = expiresAt || "perpetual";

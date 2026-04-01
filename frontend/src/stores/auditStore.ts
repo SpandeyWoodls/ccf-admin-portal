@@ -13,7 +13,7 @@ export interface AuditLog {
   adminUser: { id: string; name: string; email: string } | null;
   ipAddress: string | null;
   userAgent: string | null;
-  metadata: Record<string, unknown> | null;
+  metadata: { oldValues: Record<string, unknown> | null; newValues: Record<string, unknown> | null } | null;
   createdAt: string;
 }
 
@@ -113,7 +113,7 @@ export const useAuditStore = create<AuditState>()((set) => ({
         adminUser: item.admin,
         ipAddress: item.ipAddress,
         userAgent: item.userAgent,
-        metadata: item.oldValues ?? item.newValues ?? null,
+        metadata: (item.oldValues || item.newValues) ? { oldValues: item.oldValues ?? null, newValues: item.newValues ?? null } : null,
         createdAt: item.createdAt,
       }));
       set({

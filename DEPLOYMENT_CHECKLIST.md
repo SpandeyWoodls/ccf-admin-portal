@@ -9,7 +9,7 @@
 - [ ] .env.template has all required variables
 
 ## Hostinger Setup (One-Time)
-- [ ] Subdomain created: admin.cyberchakra.in
+- [ ] Subdomain created: cyberchakra.online
 - [ ] SSL certificate activated (Let's Encrypt)
 - [ ] MySQL database created in hPanel
 - [ ] Node.js configured in hPanel (version 20, entry: backend/dist/index.js)
@@ -21,7 +21,7 @@
 3. [ ] SSH in, run scripts/hostinger-setup.sh (first time only)
 4. [ ] Configure .env with production values
 5. [ ] Restart Node.js via hPanel
-6. [ ] Verify health endpoint: curl https://admin.cyberchakra.in/api/v1/health
+6. [ ] Verify health endpoint: curl https://cyberchakra.online/api/v1/health
 7. [ ] Verify admin login works
 8. [ ] Verify desktop app can reach endpoints (test activate/validate)
 
@@ -33,5 +33,5 @@
 - [ ] Monitor logs for first 24 hours
 
 ## DNS Configuration
-- admin.cyberchakra.in → Hostinger IP (A record)
-- license.cyberchakra.in → Same Hostinger IP (for backward compat)
+- cyberchakra.online → Hostinger IP (A record)
+- cyberchakra.online → Same Hostinger IP (for backward compat)

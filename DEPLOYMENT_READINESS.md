@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-29
 **Author:** Deployment Readiness Audit (automated)
-**Target Environment:** Hostinger Cloud at `admin.cyberchakra.in`
+**Target Environment:** Hostinger Cloud at `cyberchakra.online`
 **Node.js:** 20.x | **Database:** MySQL 8.0 | **Frontend:** Vite + React 19 SPA
 
 ---
@@ -271,7 +271,7 @@ for direct Node.js requests that bypass Apache/LiteSpeed.
 | `JWT_EXPIRES_IN` | Yes | `1h` | Documented |
 | `JWT_REFRESH_EXPIRES_IN` | Yes | `7d` | Documented |
 | `CCF_HMAC_SECRET` | Yes | Must match desktop app binary | Documented |
-| `CORS_ORIGIN` | Yes | `https://admin.cyberchakra.in` | Documented |
+| `CORS_ORIGIN` | Yes | `https://cyberchakra.online` | Documented |
 | `GITHUB_WEBHOOK_SECRET` | Yes | Random hex (match GitHub repo secret) | Documented |
 | `VITE_API_URL` | Frontend | Empty (uses proxy) or full URL | Documented |
 | `SMTP_HOST` | Optional | SMTP server hostname | Documented |
@@ -280,7 +280,7 @@ for direct Node.js requests that bypass Apache/LiteSpeed.
 | `SMTP_USER` | Optional | SMTP username | Documented |
 | `SMTP_PASS` | Optional | SMTP password | Documented |
 | `SMTP_FROM` | Optional | `noreply@cyberchakra.in` | Documented |
-| `PORTAL_URL` | Optional | `https://admin.cyberchakra.in` | Documented |
+| `PORTAL_URL` | Optional | `https://cyberchakra.online` | Documented |
 | `LOG_LEVEL` | Optional | `info` (production) | Documented |
 
 **Env check script:** `npm run env:check` runs `src/env-check.ts` to validate config on startup.
@@ -305,7 +305,7 @@ This is acceptable for initial launch but should be automated post-launch.
 ### 2.1 Infrastructure Setup
 
 - [ ] Hostinger Start Cloud account active and accessible
-- [ ] `admin.cyberchakra.in` subdomain created in hPanel DNS zone
+- [ ] `cyberchakra.online` subdomain created in hPanel DNS zone
 - [ ] SSL certificate provisioned (Let's Encrypt via hPanel)
 - [ ] MySQL 8.0 database created in hPanel (note: Hostinger prefixes DB name with account ID)
 - [ ] Node.js 20 selected as runtime in hPanel
@@ -348,7 +348,7 @@ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 
 - [ ] Set `VITE_API_URL` appropriately:
   - Production: leave empty (API served from same domain via .htaccess proxy)
-  - Or set to `https://admin.cyberchakra.in` if needed
+  - Or set to `https://cyberchakra.online` if needed
 - [ ] Run `npm run build` in `frontend/` directory
 - [ ] Verify `frontend/dist/` contains `index.html` and hashed JS/CSS assets
 
@@ -362,11 +362,11 @@ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 
 ### 2.7 DNS Configuration
 
-- [ ] `admin.cyberchakra.in` A record pointing to Hostinger server IP
-- [ ] `license.cyberchakra.in` A record pointing to SAME Hostinger IP (backward compat)
+- [ ] `cyberchakra.online` A record pointing to Hostinger server IP
+- [ ] `cyberchakra.online` A record pointing to SAME Hostinger IP (backward compat)
 - [ ] TTL set to 300 seconds (5 min) during migration, increase to 3600 after stable
-- [ ] Verify DNS propagation: `dig admin.cyberchakra.in`
-- [ ] Verify SSL working on both subdomains: `curl -I https://admin.cyberchakra.in`
+- [ ] Verify DNS propagation: `dig cyberchakra.online`
+- [ ] Verify SSL working on both subdomains: `curl -I https://cyberchakra.online`
 
 ---
 
@@ -403,7 +403,7 @@ Restart Node.js via Hostinger hPanel control panel.
 
 ### Step 5: Verify
 ```bash
-curl https://admin.cyberchakra.in/api/v1/health
+curl https://cyberchakra.online/api/v1/health
 # Expected: {"success":true,"data":{"status":"ok","timestamp":"..."}}
 ```
 
@@ -417,7 +417,7 @@ curl https://admin.cyberchakra.in/api/v1/health
 - [ ] Admin login working: `POST /api/v1/auth/login` with seed credentials
 - [ ] **CHANGE DEFAULT ADMIN PASSWORD** immediately after first login
 - [ ] Dashboard page loads with real data (even if all zeros)
-- [ ] Swagger docs accessible at `https://admin.cyberchakra.in/api/docs`
+- [ ] Swagger docs accessible at `https://cyberchakra.online/api/docs`
 
 ### 4.2 Desktop App Compatibility (within 1 hour)
 
@@ -510,7 +510,7 @@ Test that old desktop app versions (v1.x) still work via `.htaccess` rewrites:
 ## 6. Rollback Plan
 
 ### Immediate Rollback (< 5 minutes)
-1. **DNS switch:** Change `admin.cyberchakra.in` and `license.cyberchakra.in` A records back to old PHP server IP
+1. **DNS switch:** Change `cyberchakra.online` and `cyberchakra.online` A records back to old PHP server IP
 2. DNS propagation is fast with 300s TTL (most resolvers update within 5 minutes)
 3. Old PHP server continues running as hot standby throughout migration
 
@@ -538,7 +538,7 @@ If rollback is needed:
 ## 7. Monitoring Plan (Post-Deployment)
 
 ### First 24 Hours
-- [ ] Set up external uptime monitor (e.g., UptimeRobot) on `https://admin.cyberchakra.in/api/v1/health`
+- [ ] Set up external uptime monitor (e.g., UptimeRobot) on `https://cyberchakra.online/api/v1/health`
 - [ ] Watch Node.js logs via Hostinger hPanel for errors
 - [ ] Monitor rate limiter triggers (check for legitimate users being blocked)
 - [ ] Verify at least one real desktop app activation succeeds
@@ -552,7 +552,7 @@ If rollback is needed:
 ### Ongoing
 - [ ] Set up daily database backups via `scripts/backup-db.sh`
 - [ ] Plan CI/CD pipeline (GitHub Actions -> auto-deploy to Hostinger)
-- [ ] Plan staging environment at `admin-staging.cyberchakra.in`
+- [ ] Plan staging environment at `staging.cyberchakra.online`
 
 ---
 

@@ -1,6 +1,6 @@
 # Hostinger Deployment Guide -- CCF Admin Portal
 
-Step-by-step instructions for deploying the CCF Admin Portal to Hostinger shared/VPS hosting at `admin.cyberchakra.in`.
+Step-by-step instructions for deploying the CCF Admin Portal to Hostinger shared/VPS hosting at `cyberchakra.online`.
 
 ---
 
@@ -16,15 +16,15 @@ Step-by-step instructions for deploying the CCF Admin Portal to Hostinger shared
 
 1. Log in to **hPanel** at https://hpanel.hostinger.com
 2. Navigate to **Domains** > **Subdomains**
-3. Create subdomain: `admin.cyberchakra.in`
-4. Note the document root (typically `public_html/admin.cyberchakra.in/` or `domains/admin.cyberchakra.in/public_html/`)
+3. Create subdomain: `cyberchakra.online`
+4. Note the document root (typically `public_html/cyberchakra.online/` or `domains/cyberchakra.online/public_html/`)
 
 ---
 
 ## Step 2: Enable SSL
 
 1. In hPanel, go to **Security** > **SSL**
-2. Select the `admin.cyberchakra.in` subdomain
+2. Select the `cyberchakra.online` subdomain
 3. Install **Let's Encrypt** free SSL certificate
 4. Enable **Force HTTPS** redirect
 5. Wait for propagation (up to 10 minutes)
@@ -114,7 +114,7 @@ CCF_HMAC_SECRET="<your-production-hmac-secret>"
 
 # Server
 PORT=3001
-CORS_ORIGIN="https://admin.cyberchakra.in"
+CORS_ORIGIN="https://cyberchakra.online"
 NODE_ENV="production"
 ```
 
@@ -143,7 +143,7 @@ npm run db:seed
 cd ~/admin-portal/frontend
 
 # Create frontend .env with production API URL
-echo 'VITE_API_URL="https://admin.cyberchakra.in"' > .env
+echo 'VITE_API_URL="https://cyberchakra.online"' > .env
 
 # Build for production
 npm run build
@@ -156,10 +156,10 @@ npm run build
 ```bash
 # Copy the built frontend files to the subdomain's document root
 # Adjust the path based on your Hostinger setup
-cp -r ~/admin-portal/frontend/dist/* ~/domains/admin.cyberchakra.in/public_html/
+cp -r ~/admin-portal/frontend/dist/* ~/domains/cyberchakra.online/public_html/
 
 # Alternatively, if using the default structure:
-# cp -r ~/admin-portal/frontend/dist/* ~/public_html/admin.cyberchakra.in/
+# cp -r ~/admin-portal/frontend/dist/* ~/public_html/cyberchakra.online/
 ```
 
 ---
@@ -168,7 +168,7 @@ cp -r ~/admin-portal/frontend/dist/* ~/domains/admin.cyberchakra.in/public_html/
 
 ```bash
 # Copy the .htaccess to the document root
-cp ~/admin-portal/.htaccess ~/domains/admin.cyberchakra.in/public_html/.htaccess
+cp ~/admin-portal/.htaccess ~/domains/cyberchakra.online/public_html/.htaccess
 ```
 
 The `.htaccess` file handles:
@@ -240,21 +240,21 @@ Run through this checklist to confirm everything is working:
 
 ```bash
 # 1. Health check
-curl https://admin.cyberchakra.in/api/v1/health
+curl https://cyberchakra.online/api/v1/health
 
 # 2. Frontend loads
-# Open https://admin.cyberchakra.in in a browser -- should see the login page
+# Open https://cyberchakra.online in a browser -- should see the login page
 
 # 3. Admin login works
 # Log in with admin@cyberchakra.in / ChangeMe123!
 # IMMEDIATELY change the default password
 
 # 4. Legacy PHP endpoints redirect correctly
-curl -I https://admin.cyberchakra.in/api/health.php
+curl -I https://cyberchakra.online/api/health.php
 # Should return 200 (proxied to Node.js backend)
 
 # 5. License activation (test with a valid license key)
-curl -X POST https://admin.cyberchakra.in/api/v1/license/validate \
+curl -X POST https://cyberchakra.online/api/v1/license/validate \
   -H "Content-Type: application/json" \
   -d '{"licenseKey":"TEST-KEY","hardwareId":"test-hw-id"}'
 ```
@@ -305,7 +305,7 @@ npm run db:push
 
 # Rebuild frontend
 cd frontend && npm run build
-cp -r dist/* ~/domains/admin.cyberchakra.in/public_html/
+cp -r dist/* ~/domains/cyberchakra.online/public_html/
 
 # Rebuild and restart backend
 cd ../backend && npm run build

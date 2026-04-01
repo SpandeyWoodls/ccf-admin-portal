@@ -86,14 +86,14 @@ JWT_EXPIRES_IN="1h"
 JWT_REFRESH_EXPIRES_IN="7d"
 CCF_HMAC_SECRET="MUST_MATCH_DESKTOP_APP"
 PORT=3001
-CORS_ORIGIN="https://admin.cyberchakra.in"
+CORS_ORIGIN="https://cyberchakra.online"
 NODE_ENV="production"
 SMTP_HOST="smtp.gmail.com"
 SMTP_PORT="587"
 SMTP_USER=""
 SMTP_PASS=""
 SMTP_FROM="noreply@cyberchakra.in"
-PORTAL_URL="https://admin.cyberchakra.in"
+PORTAL_URL="https://cyberchakra.online"
 GITHUB_WEBHOOK_SECRET=""
 EOF
 

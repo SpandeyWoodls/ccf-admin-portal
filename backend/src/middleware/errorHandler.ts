@@ -20,8 +20,13 @@ export class AppError extends Error {
 
 /**
  * Global Express error handler.
+ *
+ * Every error response includes `requestId` so the caller can reference
+ * the exact server-side log entry when reporting issues.
  */
 export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction): void {
+  const requestId = _req.requestId ?? "unknown";
+
   // Zod validation errors
   if (err instanceof ZodError) {
     const formatted = err.errors.map((e) => ({
@@ -34,6 +39,7 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
       error: "VALIDATION_ERROR",
       message: "Request validation failed",
       details: formatted,
+      requestId,
     });
     return;
   }
@@ -45,6 +51,7 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
       data: null,
       error: err.code,
       message: err.message,
+      requestId,
     });
     return;
   }
@@ -56,6 +63,7 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
       data: null,
       error: "DUPLICATE_ENTRY",
       message: "A record with that value already exists",
+      requestId,
     });
     return;
   }
@@ -66,17 +74,20 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
       data: null,
       error: "NOT_FOUND",
       message: "Record not found",
+      requestId,
     });
     return;
   }
 
-  // Unexpected errors — hide details in production
-  console.error("[UNHANDLED ERROR]", err);
-  const isProduction = process.env.NODE_ENV === "production";
+  // Unexpected errors — always hide details from clients.
+  // Stack traces, file paths, and internal error messages must never
+  // reach the response body regardless of NODE_ENV.
+  console.error("[UNHANDLED ERROR]", { requestId, error: err });
   res.status(500).json({
     success: false,
     data: null,
     error: "INTERNAL_ERROR",
-    message: isProduction ? "An unexpected error occurred" : err.message,
+    message: "An unexpected error occurred",
+    requestId,
   });
 }

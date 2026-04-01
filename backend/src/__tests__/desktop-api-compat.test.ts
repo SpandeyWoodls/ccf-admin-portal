@@ -321,7 +321,7 @@ const HEARTBEAT_WITH_UPDATE: RustHeartbeatResponse = {
   announcements: [],
   update_available: {
     version: "2.1.0",
-    url: "https://releases.cyberchakra.in/v2.1.0/ccf-setup.exe",
+    url: "https://releases.cyberchakra.online/v2.1.0/ccf-setup.exe",
     changelog: "New features and bug fixes",
   },
 };
@@ -335,7 +335,7 @@ const UPDATE_CHECK_AVAILABLE: TauriUpdaterResponse = {
   platforms: {
     "windows-x86_64": {
       signature: "dW50cnVzdGVkIGNvbW1lbnQ6...", // base64 signature
-      url: "https://releases.cyberchakra.in/v2.1.0/ccf-setup.exe",
+      url: "https://releases.cyberchakra.online/v2.1.0/ccf-setup.exe",
     },
   },
 };

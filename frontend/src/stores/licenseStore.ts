@@ -55,6 +55,7 @@ export interface LicenseDetail extends License {
 export interface LicenseFilters {
   status?: string;
   tier?: string;
+  licenseType?: string;
   search?: string;
   page: number;
   limit: number;
@@ -154,6 +155,8 @@ export const useLicenseStore = create<LicenseState>()((set, get) => ({
         params.set("status", filters.status);
       if (filters.tier && filters.tier !== "all")
         params.set("tier", filters.tier);
+      if (filters.licenseType && filters.licenseType !== "all")
+        params.set("licenseType", filters.licenseType);
       if (filters.search) params.set("search", filters.search);
 
       const raw = await apiGet<BackendPaginatedResponse<License>>(
@@ -230,7 +233,7 @@ export const useLicenseStore = create<LicenseState>()((set, get) => ({
         isActionLoading: false,
         error: err instanceof Error ? err.message : "Failed to suspend license",
       });
-      return;
+      throw err;
     }
     const { selectedLicense } = get();
     if (selectedLicense?.id === id) {
@@ -256,7 +259,7 @@ export const useLicenseStore = create<LicenseState>()((set, get) => ({
         isActionLoading: false,
         error: err instanceof Error ? err.message : "Failed to revoke license",
       });
-      return;
+      throw err;
     }
     const { selectedLicense } = get();
     if (selectedLicense?.id === id) {
@@ -287,7 +290,7 @@ export const useLicenseStore = create<LicenseState>()((set, get) => ({
         isActionLoading: false,
         error: err instanceof Error ? err.message : "Failed to reinstate license",
       });
-      return;
+      throw err;
     }
     const { selectedLicense } = get();
     if (selectedLicense?.id === id) {
@@ -326,6 +329,7 @@ export const useLicenseStore = create<LicenseState>()((set, get) => ({
         isActionLoading: false,
         error: err instanceof Error ? err.message : "Failed to renew license",
       });
+      throw err;
     }
   },
 
@@ -341,7 +345,7 @@ export const useLicenseStore = create<LicenseState>()((set, get) => ({
         isActionLoading: false,
         error: err instanceof Error ? err.message : "Failed to deactivate machine",
       });
-      return;
+      throw err;
     }
     set((state) => {
       const sel = state.selectedLicense;

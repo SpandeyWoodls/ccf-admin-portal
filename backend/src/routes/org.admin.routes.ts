@@ -17,26 +17,26 @@ router.use(requireAuth);
 
 const createOrgSchema = z.object({
   name: z.string().min(1).max(255),
-  slug: z.string().min(1).max(255).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase alphanumeric with hyphens"),
+  slug: z.string().min(1).max(100).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase alphanumeric with hyphens"),
   orgType: z.enum(["government", "law_enforcement", "corporate", "academic", "private_lab", "individual"]),
-  email: z.string().email().optional().nullable(),
-  phone: z.string().optional().nullable(),
-  address: z.string().optional().nullable(),
-  city: z.string().optional().nullable(),
-  state: z.string().optional().nullable(),
+  email: z.string().email().max(320).optional().nullable(),
+  phone: z.string().max(30).optional().nullable(),
+  address: z.string().max(500).optional().nullable(),
+  city: z.string().max(100).optional().nullable(),
+  state: z.string().max(100).optional().nullable(),
   country: z.string().max(10).default("IN"),
-  gstin: z.string().optional().nullable(),
-  panNumber: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
+  gstin: z.string().max(20).optional().nullable(),
+  panNumber: z.string().max(20).optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
 });
 
 const updateOrgSchema = createOrgSchema.partial();
 
 const createContactSchema = z.object({
   name: z.string().min(1).max(255),
-  email: z.string().email().optional().nullable(),
-  phone: z.string().optional().nullable(),
-  designation: z.string().optional().nullable(),
+  email: z.string().email().max(320).optional().nullable(),
+  phone: z.string().max(30).optional().nullable(),
+  designation: z.string().max(255).optional().nullable(),
   role: z.enum(["primary", "billing", "technical", "decision_maker"]).default("primary"),
 });
 
@@ -159,14 +159,18 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
  *       404:
  *         description: Organization not found
  */
+const uuidSchema = z.string().uuid("Invalid UUID format");
+
 router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const id = uuidSchema.parse(req.params.id);
     const org = await prisma.organization.findUnique({
-      where: { id: req.params.id as string },
+      where: { id },
       include: {
-        contacts: { orderBy: { createdAt: "desc" } },
+        contacts: { orderBy: { createdAt: "desc" }, take: 100 },
         licenses: {
           orderBy: { createdAt: "desc" },
+          take: 200,
           include: {
             _count: { select: { activations: { where: { isActive: true } } } },
           },
@@ -348,13 +352,14 @@ router.patch(
   requireRole("admin", "super_admin"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const id = uuidSchema.parse(req.params.id);
       const body = updateOrgSchema.parse(req.body);
 
-      const existing = await prisma.organization.findUnique({ where: { id: req.params.id as string } });
+      const existing = await prisma.organization.findUnique({ where: { id } });
       if (!existing) throw new AppError(404, "Organization not found", "NOT_FOUND");
 
       const updated = await prisma.organization.update({
-        where: { id: req.params.id as string },
+        where: { id },
         data: body as any,
       });
 
@@ -380,12 +385,14 @@ router.patch(
 
 router.get("/:id/contacts", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const org = await prisma.organization.findUnique({ where: { id: req.params.id as string } });
+    const id = uuidSchema.parse(req.params.id);
+    const org = await prisma.organization.findUnique({ where: { id } });
     if (!org) throw new AppError(404, "Organization not found", "NOT_FOUND");
 
     const contacts = await prisma.contact.findMany({
-      where: { organizationId: req.params.id as string },
+      where: { organizationId: id },
       orderBy: { createdAt: "desc" },
+      take: 200,
     });
 
     res.json({ success: true, data: contacts, error: null, message: "" });
@@ -401,14 +408,15 @@ router.post(
   requireRole("admin", "super_admin", "support"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const id = uuidSchema.parse(req.params.id);
       const body = createContactSchema.parse(req.body);
 
-      const org = await prisma.organization.findUnique({ where: { id: req.params.id as string } });
+      const org = await prisma.organization.findUnique({ where: { id } });
       if (!org) throw new AppError(404, "Organization not found", "NOT_FOUND");
 
       const contact = await prisma.contact.create({
         data: {
-          organizationId: req.params.id as string,
+          organizationId: id,
           name: body.name,
           email: body.email ?? null,
           phone: body.phone ?? null,
@@ -422,7 +430,7 @@ router.post(
         action: "create_contact",
         resourceType: "contact",
         resourceId: contact.id,
-        newValues: { name: body.name, organizationId: req.params.id as string },
+        newValues: { name: body.name, organizationId: id },
         ipAddress: req.ip ?? null,
         userAgent: req.headers["user-agent"] ?? null,
       });

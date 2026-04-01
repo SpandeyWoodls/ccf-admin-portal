@@ -11,6 +11,7 @@ import {
   LifeBuoy,
   Download,
   ScrollText,
+  Users,
   Settings,
   ChevronLeft,
   LogOut,
@@ -86,6 +87,7 @@ const navigation: NavSection[] = [
     title: "SYSTEM",
     items: [
       { label: "Audit Log", href: "/audit", icon: ScrollText, requiredPermission: "audit.view" },
+      { label: "Users", href: "/users", icon: Users, requiredPermission: "settings.team" },
       { label: "Settings", href: "/settings", icon: Settings, requiredPermission: "settings.view" },
     ],
   },

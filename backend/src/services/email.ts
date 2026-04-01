@@ -16,7 +16,7 @@ function getTransporter(): nodemailer.Transporter | null {
 
   // Option 1: Full SMTP configuration (Gmail, SES, etc.)
   if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-    console.log("[Email] Using SMTP transport");
+    console.log(`[Email] ${new Date().toISOString()} Using SMTP transport`);
     _transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || "smtp.gmail.com",
       port: parseInt(process.env.SMTP_PORT || "587"),
@@ -31,7 +31,7 @@ function getTransporter(): nodemailer.Transporter | null {
 
   // Option 2: Local sendmail binary (available on Hostinger VPS)
   if (process.env.USE_SENDMAIL === "true") {
-    console.log("[Email] Using sendmail transport");
+    console.log(`[Email] ${new Date().toISOString()} Using sendmail transport`);
     _transporter = nodemailer.createTransport({
       sendmail: true,
       newline: "unix",
@@ -41,13 +41,13 @@ function getTransporter(): nodemailer.Transporter | null {
   }
 
   // Option 3: No transport configured -- will log only
-  console.log("[Email] No email transport configured (set SMTP_USER/SMTP_PASS or USE_SENDMAIL=true)");
+  console.log(`[Email] ${new Date().toISOString()} No email transport configured (set SMTP_USER/SMTP_PASS or USE_SENDMAIL=true)`);
   _transporter = null;
   return null;
 }
 
 function getFromEmail(): string {
-  if (!_fromEmail) _fromEmail = process.env.SMTP_FROM || "noreply@cyberchakra.online";
+  if (!_fromEmail) _fromEmail = process.env.SMTP_FROM || "noreply@cyberchakra.in";
   return _fromEmail;
 }
 
@@ -58,6 +58,14 @@ export function getPortalUrl(): string {
 
 // Keep backward-compatible named export
 export const PORTAL_URL = "https://cyberchakra.online"; // default; callers should prefer getPortalUrl()
+
+export function getEmailStatus(): { configured: boolean; transport: string } {
+  const transporter = getTransporter();
+  if (!transporter) return { configured: false, transport: "none" };
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) return { configured: true, transport: "smtp" };
+  if (process.env.USE_SENDMAIL === "true") return { configured: true, transport: "sendmail" };
+  return { configured: false, transport: "none" };
+}
 
 // ─── Send email utility ────────────────────────────────────────────────────
 
@@ -78,6 +86,6 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
     });
     console.log(`[Email] Sent to ${to}: ${subject}`);
   } catch (error) {
-    console.error(`[Email] Failed to send to ${to}:`, error);
+    console.error(`[Email] ${new Date().toISOString()} Failed to send to ${to} (subject: ${subject}):`, error);
   }
 }

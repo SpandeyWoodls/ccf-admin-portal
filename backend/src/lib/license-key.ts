@@ -58,7 +58,7 @@ export function generateLicenseKey(): string {
  * Validate a license key's HMAC checksum.
  */
 export function validateLicenseKeyChecksum(key: string): boolean {
-  if (!/^CCF-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(key)) {
+  if (!/^CCF-(?:TRIAL-)?[A-Z2-9]{4,5}-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4,5}$/.test(key)) {
     return false;
   }
 
@@ -66,5 +66,6 @@ export function validateLicenseKeyChecksum(key: string): boolean {
   const providedChecksum = key.slice(-2);
   const expectedChecksum = computeChecksum(body);
 
-  return providedChecksum === expectedChecksum;
+  // Use constant-time comparison to prevent timing attacks
+  return crypto.timingSafeEqual(Buffer.from(providedChecksum), Buffer.from(expectedChecksum));
 }

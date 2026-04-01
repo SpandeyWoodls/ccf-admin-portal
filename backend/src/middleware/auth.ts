@@ -49,12 +49,15 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     const token = header.slice(7);
     const secret = process.env.JWT_SECRET;
     if (!secret) {
-      throw new AppError(500, "JWT_SECRET not configured", "CONFIG_ERROR");
+      throw new AppError(500, "Server authentication configuration error", "CONFIG_ERROR");
     }
 
     let payload: JwtPayload;
     try {
-      payload = jwt.verify(token, secret) as JwtPayload;
+      payload = jwt.verify(token, secret, {
+        algorithms: ['HS256'],
+        issuer: 'ccf-admin-portal',
+      }) as JwtPayload;
     } catch (err: any) {
       if (err.name === "TokenExpiredError") {
         throw new AppError(401, "Access token expired", "TOKEN_EXPIRED");

@@ -15,10 +15,14 @@ interface AuthState {
   refreshToken: string | null;
   isLoading: boolean;
   error: string | null;
+  mfaPending: boolean;
+  mfaSessionId: string | null;
   login: (email: string, password: string) => Promise<void>;
+  verifyMfa: (mfaSessionId: string, token: string) => Promise<void>;
   logout: () => void;
   refreshAuth: () => Promise<void>;
   clearError: () => void;
+  clearMfa: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -29,6 +33,8 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       isLoading: false,
       error: null,
+      mfaPending: false,
+      mfaSessionId: null,
 
       login: async (email: string, password: string) => {
         set({ isLoading: true, error: null });
@@ -47,6 +53,17 @@ export const useAuthStore = create<AuthState>()(
             const json = await response.json();
             // Backend wraps in { success, data, error, message } envelope
             const payload = json.data ?? json;
+
+            // MFA required — store session ID and bail before setting tokens
+            if (payload.requiresMfa === true) {
+              set({
+                mfaPending: true,
+                mfaSessionId: payload.mfaSessionId,
+                isLoading: false,
+              });
+              return;
+            }
+
             set({
               user: payload.admin ?? payload.user,
               token: payload.accessToken ?? payload.token,
@@ -64,9 +81,9 @@ export const useAuthStore = create<AuthState>()(
 
           throw new Error('Server error');
         } catch (err) {
-          // If network error (backend not running), fall back to mock
-          if (err instanceof TypeError && err.message.includes('fetch')) {
-            console.warn('Backend not available, using mock auth');
+          // Mock auth only in development mode
+          if (import.meta.env.DEV && err instanceof TypeError && err.message.includes('fetch')) {
+            console.warn('[DEV] Backend not available, using mock auth');
             await new Promise((r) => setTimeout(r, 500));
             set({
               user: {
@@ -93,6 +110,45 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
+      verifyMfa: async (mfaSessionId: string, token: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch(
+            (import.meta.env.VITE_API_URL || '') + '/api/v1/auth/mfa/verify',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mfaSessionId, token }),
+            }
+          );
+
+          if (response.ok) {
+            const json = await response.json();
+            const payload = json.data ?? json;
+            set({
+              user: payload.admin ?? payload.user,
+              token: payload.accessToken ?? payload.token,
+              refreshToken: payload.refreshToken,
+              mfaPending: false,
+              mfaSessionId: null,
+              isLoading: false,
+            });
+            return;
+          }
+
+          const data = await response.json();
+          throw new Error(data.message || data.error || 'Invalid MFA code');
+        } catch (err) {
+          set({
+            isLoading: false,
+            error: err instanceof Error ? err.message : 'MFA verification failed',
+          });
+          throw err;
+        }
+      },
+
+      clearMfa: () => set({ mfaPending: false, mfaSessionId: null, error: null }),
+
       logout: () => {
         // Fire and forget - try to notify backend but always clear local state
         const token = get().token;
@@ -115,6 +171,8 @@ export const useAuthStore = create<AuthState>()(
           token: null,
           refreshToken: null,
           error: null,
+          mfaPending: false,
+          mfaSessionId: null,
         });
       },
 

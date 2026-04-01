@@ -6,11 +6,14 @@ import {
   Lock,
   CheckCircle2,
   XCircle,
+  AlertCircle,
   MessageSquare,
   Loader2,
   Inbox,
   StickyNote,
   User,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { maskLicenseKey, cn } from "@/lib/utils";
 import {
   useSupportStore,
+  useSupportPagination,
   type Ticket,
   type TicketMessage,
 } from "@/stores/supportStore";
@@ -254,6 +258,23 @@ function NoFilterResultsState() {
   );
 }
 
+/** Error banner */
+function ErrorBanner({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/40 dark:bg-red-950/30 dark:text-red-400">
+      <AlertCircle className="h-4 w-4 shrink-0" />
+      <span className="flex-1">{message}</span>
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="shrink-0 rounded-md p-0.5 hover:bg-red-100 dark:hover:bg-red-900/30"
+      >
+        <XCircle className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
 const priorityBorderColor: Record<string, string> = {
   critical: "border-l-red-500",
   high: "border-l-amber-500",
@@ -433,27 +454,58 @@ export function SupportPage() {
     tickets,
     selectedTicket,
     isLoading,
+    isDetailLoading,
+    error,
     fetchTickets,
     fetchTicket,
     replyToTicket,
     closeTicket,
+    updateTicket,
     clearSelectedTicket,
   } = useSupportStore();
+
+  const pagination = useSupportPagination();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [statusTab, setStatusTab] = useState("all");
   const [search, setSearch] = useState("");
+  const [searchDebounced, setSearchDebounced] = useState("");
   const [replyText, setReplyText] = useState("");
   const [isInternal, setIsInternal] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch tickets on mount
+  // Build filter object from current UI state
+  const buildFilters = useCallback(
+    (overrides?: { page?: number; status?: string; search?: string }) => ({
+      status: overrides?.status ?? statusTab,
+      search: overrides?.search ?? searchDebounced,
+      page: overrides?.page ?? 1,
+      limit: pagination.limit,
+    }),
+    [statusTab, searchDebounced, pagination.limit],
+  );
+
+  // Fetch tickets on mount and when filters change
   useEffect(() => {
-    fetchTickets().finally(() => setInitialLoad(false));
-  }, [fetchTickets]);
+    const filters = buildFilters();
+    fetchTickets(filters).finally(() => setInitialLoad(false));
+  }, [statusTab, searchDebounced]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounce search input
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setSearchDebounced(search);
+    }, 300);
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [search]);
 
   // Fetch ticket detail when selection changes
   useEffect(() => {
@@ -471,39 +523,8 @@ export function SupportPage() {
     }
   }, [selectedTicket?.messages?.length, selectedId]);
 
-  // Client-side filtering on top of fetched tickets
+  // Ticket list (already filtered server-side by status + search)
   const safeTickets = Array.isArray(tickets) ? tickets : [];
-  const filtered = safeTickets.filter((t) => {
-    if (statusTab !== "all" && t.status !== statusTab) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return (
-        t.id.toLowerCase().includes(q) ||
-        (t.ticketNumber ?? "").toLowerCase().includes(q) ||
-        t.subject.toLowerCase().includes(q) ||
-        (t.organization?.name ?? "").toLowerCase().includes(q) ||
-        t.requesterName.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
-
-  // Stats derived from real ticket data
-  const openCount = safeTickets.filter((t) => t.status === "open").length;
-  const inProgressCount = safeTickets.filter(
-    (t) => t.status === "in_progress",
-  ).length;
-  const waitingCount = safeTickets.filter((t) => t.status === "waiting").length;
-
-  // Tab counts
-  const tabCounts: Record<string, number> = {
-    all: safeTickets.length,
-    open: openCount,
-    in_progress: inProgressCount,
-    waiting: waitingCount,
-    resolved: safeTickets.filter((t) => t.status === "resolved").length,
-    closed: safeTickets.filter((t) => t.status === "closed").length,
-  };
 
   // Handlers
   const handleSelectTicket = useCallback(
@@ -515,6 +536,11 @@ export function SupportPage() {
     [],
   );
 
+  const handleStatusTabChange = useCallback((value: string) => {
+    setStatusTab(value);
+    setSelectedId(null);
+  }, []);
+
   const handleSendReply = useCallback(async () => {
     if (!replyText.trim() || !selectedId) return;
     setIsSending(true);
@@ -522,6 +548,8 @@ export function SupportPage() {
       await replyToTicket(selectedId, replyText.trim(), isInternal);
       setReplyText("");
       setIsInternal(false);
+    } catch {
+      // Error is set in the store
     } finally {
       setIsSending(false);
     }
@@ -529,46 +557,74 @@ export function SupportPage() {
 
   const handleCloseTicket = useCallback(async () => {
     if (!selectedId) return;
-    await closeTicket(selectedId);
-    // Refresh tickets list
-    await fetchTickets();
-  }, [selectedId, closeTicket, fetchTickets]);
+    setIsClosing(true);
+    try {
+      await closeTicket(selectedId);
+      // Refresh tickets list to get updated counts
+      await fetchTickets(buildFilters({ page: pagination.page }));
+    } catch {
+      // Error is set in the store
+    } finally {
+      setIsClosing(false);
+    }
+  }, [selectedId, closeTicket, fetchTickets, buildFilters, pagination.page]);
+
+  const handleStatusChange = useCallback(
+    async (newStatus: string) => {
+      if (!selectedId) return;
+      try {
+        await updateTicket(selectedId, { status: newStatus });
+        await fetchTickets(buildFilters({ page: pagination.page }));
+      } catch {
+        // Error is set in the store
+      }
+    },
+    [selectedId, updateTicket, fetchTickets, buildFilters, pagination.page],
+  );
+
+  // Pagination handlers
+  const handlePrevPage = useCallback(() => {
+    if (pagination.page <= 1) return;
+    fetchTickets(buildFilters({ page: pagination.page - 1 }));
+  }, [fetchTickets, buildFilters, pagination.page]);
+
+  const handleNextPage = useCallback(() => {
+    if (pagination.page >= pagination.totalPages) return;
+    fetchTickets(buildFilters({ page: pagination.page + 1 }));
+  }, [fetchTickets, buildFilters, pagination.page, pagination.totalPages]);
+
+  const handleDismissError = useCallback(() => {
+    useSupportStore.setState({ error: null });
+  }, []);
 
   // If initial load hasn't finished, show full skeleton
   const showGlobalSkeleton = initialLoad && isLoading;
 
-  // Check if we have no tickets at all (after loading)
-  const hasNoTickets = !initialLoad && safeTickets.length === 0;
+  // Check if we have no tickets at all (after loading, with no filters)
+  const hasNoTickets = !initialLoad && !isLoading && safeTickets.length === 0 && statusTab === "all" && !searchDebounced;
+
+  // Check if current filter returned nothing
+  const hasNoFilterResults = !initialLoad && !isLoading && safeTickets.length === 0 && (statusTab !== "all" || !!searchDebounced);
 
   return (
     <div className="space-y-3">
-      {/* Compact header: title + stats + tabs in tight rows */}
+      {/* Error banner */}
+      {error && <ErrorBanner message={error} onDismiss={handleDismissError} />}
+
+      {/* Compact header: title + stats */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight text-[hsl(var(--foreground))]">
           Support
         </h1>
-        {!showGlobalSkeleton && (
+        {!showGlobalSkeleton && pagination.total > 0 && (
           <div className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-1 text-[11px] font-medium text-[hsl(var(--foreground))]">
-            <span className="inline-flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))]" />
-              <span>{openCount}</span>
-            </span>
-            <span className="mx-1.5 text-[hsl(var(--border))]">|</span>
-            <span className="inline-flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--warning))]" />
-              <span>{inProgressCount}</span>
-            </span>
-            <span className="mx-1.5 text-[hsl(var(--border))]">|</span>
-            <span className="inline-flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--muted-foreground))]" />
-              <span>{waitingCount}</span>
-            </span>
+            <span>{pagination.total} ticket{pagination.total !== 1 ? "s" : ""}</span>
           </div>
         )}
       </div>
 
       {/* Status Tabs */}
-      <Tabs value={statusTab} onValueChange={(v) => setStatusTab(v)}>
+      <Tabs value={statusTab} onValueChange={handleStatusTabChange}>
         <TabsList>
           {[
             { value: "all", label: "All" },
@@ -580,11 +636,6 @@ export function SupportPage() {
           ].map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.label}
-              {!showGlobalSkeleton && tabCounts[tab.value] > 0 && (
-                <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[hsl(var(--muted-foreground)/0.15)] px-1.5 text-[10px] font-semibold text-[hsl(var(--muted-foreground))]">
-                  {tabCounts[tab.value]}
-                </span>
-              )}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -621,12 +672,12 @@ export function SupportPage() {
 
             {/* Ticket list */}
             <div className="flex-1 overflow-y-auto">
-              {showGlobalSkeleton ? (
+              {showGlobalSkeleton || (isLoading && safeTickets.length === 0) ? (
                 <TicketListSkeleton />
-              ) : filtered.length === 0 ? (
+              ) : hasNoFilterResults || safeTickets.length === 0 ? (
                 <NoFilterResultsState />
               ) : (
-                filtered.map((ticket) => (
+                safeTickets.map((ticket) => (
                   <TicketListItem
                     key={ticket.id}
                     ticket={ticket}
@@ -636,13 +687,49 @@ export function SupportPage() {
                 ))
               )}
             </div>
+
+            {/* Pagination */}
+            {pagination.totalPages > 1 && (
+              <div className="border-t border-[hsl(var(--border))] px-3 py-2 flex items-center justify-between">
+                <span className="text-[11px] text-[hsl(var(--muted-foreground))]">
+                  Page {pagination.page} of {pagination.totalPages}
+                  <span className="hidden sm:inline"> &middot; {pagination.total} tickets</span>
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    disabled={pagination.page <= 1 || isLoading}
+                    onClick={handlePrevPage}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                    Prev
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    disabled={pagination.page >= pagination.totalPages || isLoading}
+                    onClick={handleNextPage}
+                  >
+                    Next
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
 
           {/* ==================== RIGHT PANEL: Conversation ==================== */}
           <Card className="flex flex-1 flex-col overflow-hidden">
             {showGlobalSkeleton ? (
               <ConversationSkeleton />
-            ) : !selectedId || !selectedTicket ? (
+            ) : !selectedId ? (
+              <NoSelectionState />
+            ) : isDetailLoading ? (
+              <ConversationSkeleton />
+            ) : !selectedTicket ? (
               <NoSelectionState />
             ) : (
               <>
@@ -677,19 +764,41 @@ export function SupportPage() {
                       </span>
                     </div>
 
-                    {/* Close button for non-closed/resolved tickets */}
-                    {selectedTicket.status !== "closed" &&
-                      selectedTicket.status !== "resolved" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleCloseTicket}
-                          className="shrink-0 text-[11px] h-7 px-2.5"
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {/* Status quick-change dropdown for non-closed tickets */}
+                      {selectedTicket.status !== "closed" && (
+                        <select
+                          value={selectedTicket.status}
+                          onChange={(e) => handleStatusChange(e.target.value)}
+                          className="h-7 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-2 text-[11px] text-[hsl(var(--foreground))] focus:outline-none focus:ring-1 focus:ring-[hsl(var(--primary)/0.3)]"
                         >
-                          <CheckCircle2 className="h-3 w-3" />
-                          Close
-                        </Button>
+                          <option value="open">Open</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="waiting">Waiting</option>
+                          <option value="resolved">Resolved</option>
+                        </select>
                       )}
+
+                      {/* Close button for non-closed/resolved tickets */}
+                      {selectedTicket.status !== "closed" &&
+                        selectedTicket.status !== "resolved" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCloseTicket}
+                            disabled={isClosing}
+                            className="shrink-0 text-[11px] h-7 px-2.5"
+                          >
+                            {isClosing ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <CheckCircle2 className="h-3 w-3" />
+                            )}
+                            Close
+                          </Button>
+                        )}
+                    </div>
                   </div>
 
                   {/* Subject */}
@@ -699,11 +808,11 @@ export function SupportPage() {
 
                   {/* Meta row -- single compact line */}
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[hsl(var(--muted-foreground)/0.6)]">
-                    {selectedTicket.license?.licenseKey && (
+                    {selectedTicket.licenseKey && (
                       <span className="flex items-center gap-1">
                         <Lock className="h-2.5 w-2.5" />
                         <span className="font-mono text-[10px]">
-                          {maskLicenseKey(selectedTicket.license.licenseKey)}
+                          {maskLicenseKey(selectedTicket.licenseKey)}
                         </span>
                       </span>
                     )}

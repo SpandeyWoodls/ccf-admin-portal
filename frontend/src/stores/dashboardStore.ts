@@ -65,12 +65,15 @@ function transformRecentActivity(rawActivity: unknown): RecentActivity[] {
       ? evt.action.replace(/_/g, ".")
       : evt.action;
 
-    // Derive resourceType from the action prefix or available relations
-    let resourceType = "license";
-    if (action?.startsWith("organization")) resourceType = "organization";
-    else if (action?.startsWith("trial")) resourceType = "trial";
-    else if (action?.startsWith("release")) resourceType = "release";
-    else if (action?.startsWith("contact")) resourceType = "contact";
+    // Derive resourceType from the action prefix
+    const RESOURCE_MAP: Record<string, string> = {
+      license: "license", organization: "organization", org: "organization",
+      trial: "trial", release: "release", contact: "contact",
+      announcement: "announcement", ticket: "ticket", support: "ticket",
+      activation: "license", user: "admin_user", admin: "admin_user",
+    };
+    const prefix = (action?.split(".")[0] ?? "").toLowerCase();
+    const resourceType = RESOURCE_MAP[prefix] ?? "license";
 
     // Derive resourceId: prefer licenseKey from nested license, then fallback
     const resourceId =

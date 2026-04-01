@@ -17,9 +17,9 @@ info:
     All public endpoints require a valid license key (X-License-Key header).
 
 servers:
-  - url: https://admin.cyberchakra.in
+  - url: https://cyberchakra.online
     description: Production
-  - url: https://staging-admin.cyberchakra.in
+  - url: https://staging.cyberchakra.online
     description: Staging
 
 # =============================================================================

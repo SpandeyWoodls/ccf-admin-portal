@@ -9,40 +9,43 @@ import semver from "semver";
 import { isAfter, isBefore, addDays } from "date-fns";
 import { shouldReceiveUpdate, getBlockedVersionInfo } from "../services/rollout.js";
 import { generateValidationToken, uuidToNumericId } from "../lib/validation-token.js";
+import { sendEmail } from "../services/email.js";
+import { licenseActivatedAlertEmail } from "../services/email-templates.js";
+import { validateLicenseKeyChecksum } from "../lib/license-key.js";
 
 const router = Router();
 
 // ─── Validation Schemas ─────────────────────────────────────────────────────
 
 const activateSchema = z.object({
-  license_key: z.string().min(1),
-  hardware_fingerprint: z.string().min(1),
-  user_email: z.string().email().optional(),
-  machine_name: z.string().optional(),
-  os_info: z.string().optional(),
-  app_version: z.string().optional(),
+  license_key: z.string().min(1).max(50),
+  hardware_fingerprint: z.string().min(1).max(512),
+  user_email: z.string().email().max(320).optional(),
+  machine_name: z.string().max(255).optional(),
+  os_info: z.string().max(512).optional(),
+  app_version: z.string().max(30).optional(),
 });
 
 const validateSchema = z.object({
-  license_key: z.string().min(1),
-  hardware_fingerprint: z.string().min(1),
-  app_version: z.string().optional(),
+  license_key: z.string().min(1).max(50),
+  hardware_fingerprint: z.string().min(1).max(512),
+  app_version: z.string().max(30).optional(),
 });
 
 const deactivateSchema = z.object({
-  license_key: z.string().min(1),
-  hardware_fingerprint: z.string().min(1),
+  license_key: z.string().min(1).max(50),
+  hardware_fingerprint: z.string().min(1).max(512),
 });
 
 const heartbeatSchema = z.object({
-  license_key: z.string().min(1),
-  hardware_fingerprint: z.string().min(1),
-  app_version: z.string().optional(),
+  license_key: z.string().min(1).max(50),
+  hardware_fingerprint: z.string().min(1).max(512),
+  app_version: z.string().max(30).optional(),
   usage_stats: z
     .object({
-      cases_created: z.number().int().min(0).optional().default(0),
-      acquisitions: z.number().int().min(0).optional().default(0),
-      reports_generated: z.number().int().min(0).optional().default(0),
+      cases_created: z.number().int().min(0).max(1_000_000).optional().default(0),
+      acquisitions: z.number().int().min(0).max(1_000_000).optional().default(0),
+      reports_generated: z.number().int().min(0).max(1_000_000).optional().default(0),
     })
     .optional(),
 });
@@ -117,10 +120,15 @@ router.post("/activate", async (req: Request, res: Response, next: NextFunction)
   try {
     const body = activateSchema.parse(req.body);
 
+    if (!validateLicenseKeyChecksum(body.license_key)) {
+      res.status(400).json(desktopResponse(false, null, "INVALID_KEY_FORMAT", "Invalid license key format"));
+      return;
+    }
+
     // Use a serializable transaction to prevent race conditions on seat limits.
     // All reads and writes happen atomically so two concurrent activations
     // cannot both pass the maxActivations check.
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       const license = await tx.license.findUnique({
         where: { licenseKey: body.license_key },
         include: { activations: { where: { isActive: true } }, organization: { select: { name: true } } },
@@ -259,6 +267,17 @@ router.post("/activate", async (req: Request, res: Response, next: NextFunction)
           app_version: body.app_version,
         },
       });
+
+      // Fire-and-forget: notify admin about new license activation
+      const adminEmail = process.env.SMTP_FROM || "admin@cyberchakra.in";
+      const { subject: alertSubject, html: alertHtml } = licenseActivatedAlertEmail(
+        body.license_key,
+        body.machine_name || "Unknown",
+        body.os_info || "Unknown OS",
+      );
+      sendEmail(adminEmail, alertSubject, alertHtml).catch(err =>
+        console.error("[Email] Activation alert failed:", err.message),
+      );
     }
 
     // Fetch active announcements for the response
@@ -270,6 +289,7 @@ router.post("/activate", async (req: Request, res: Response, next: NextFunction)
         OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
       },
       select: { message: true, announcementType: true },
+      take: 50,
     });
 
     const nextValidation = new Date();
@@ -330,6 +350,11 @@ router.post("/validate", async (req: Request, res: Response, next: NextFunction)
   try {
     const body = validateSchema.parse(req.body);
 
+    if (!validateLicenseKeyChecksum(body.license_key)) {
+      res.status(400).json(desktopResponse(false, null, "INVALID_KEY_FORMAT", "Invalid license key format"));
+      return;
+    }
+
     const license = await prisma.license.findUnique({
       where: { licenseKey: body.license_key },
       include: { organization: { select: { name: true } } },
@@ -353,11 +378,11 @@ router.post("/validate", async (req: Request, res: Response, next: NextFunction)
     }
 
     if (license.status === "revoked") {
-      res.status(403).json(desktopResponse(false, null, "LICENSE_REVOKED", "This license has been revoked"));
+      res.status(403).json(desktopResponse(false, null, "LICENSE_REVOKED", "This license has been revoked by the administrator."));
       return;
     }
     if (license.status === "suspended") {
-      res.status(403).json(desktopResponse(false, null, "LICENSE_SUSPENDED", "This license is suspended"));
+      res.status(403).json(desktopResponse(false, null, "LICENSE_SUSPENDED", "This license has been temporarily suspended. Contact your administrator."));
       return;
     }
 
@@ -409,10 +434,11 @@ router.post("/validate", async (req: Request, res: Response, next: NextFunction)
         OR: [{ expiresAt: null }, { expiresAt: { gt: validateNow } }],
       },
       select: { message: true, announcementType: true },
+      take: 50,
     });
 
     // Response MUST match Rust ServerResponseData struct:
-    // { license_id (int), organization (name string), expires_at, validation_token (HMAC base64), next_validation, announcements }
+    // { license_id (int), organization (name string), expires_at, validation_token (HMAC base64), next_validation, announcements, license_status }
     res.json(
       desktopResponse(true, {
         license_id: uuidToNumericId(license.id),
@@ -420,6 +446,7 @@ router.post("/validate", async (req: Request, res: Response, next: NextFunction)
         expires_at: validateExpiresAt || null,
         validation_token: validateHmacToken,
         next_validation: validateNextValidation.toISOString(),
+        license_status: license.status,
         announcements: validateAnnouncements.map((a: any) => ({
           message: a.message,
           announcement_type: a.announcementType,
@@ -462,50 +489,55 @@ router.post("/deactivate", async (req: Request, res: Response, next: NextFunctio
   try {
     const body = deactivateSchema.parse(req.body);
 
-    const license = await prisma.license.findUnique({
-      where: { licenseKey: body.license_key },
-    });
-
-    if (!license) {
-      res.status(404).json(desktopResponse(false, null, "LICENSE_NOT_FOUND", "License key not found"));
+    if (!validateLicenseKeyChecksum(body.license_key)) {
+      res.status(400).json(desktopResponse(false, null, "INVALID_KEY_FORMAT", "Invalid license key format"));
       return;
     }
 
-    const activation = await prisma.licenseActivation.findFirst({
-      where: {
-        licenseId: license.id,
-        hardwareFingerprint: body.hardware_fingerprint,
-        isActive: true,
-      },
-    });
+    // Use an interactive transaction so the lookup + deactivation are atomic,
+    // preventing a race where two concurrent requests both find the same
+    // active activation and double-decrement currentActivations.
+    const result = await prisma.$transaction(async (tx: any) => {
+      const license = await tx.license.findUnique({
+        where: { licenseKey: body.license_key },
+      });
 
-    if (!activation) {
-      res.status(404).json(
-        desktopResponse(false, null, "ACTIVATION_NOT_FOUND", "No active activation found for this machine"),
-      );
-      return;
-    }
+      if (!license) {
+        throw new AppError(404, "License key not found", "LICENSE_NOT_FOUND");
+      }
 
-    // Deactivate
-    await prisma.licenseActivation.update({
-      where: { id: activation.id },
-      data: {
-        isActive: false,
-        deactivatedAt: new Date(),
-      },
-    });
+      const activation = await tx.licenseActivation.findFirst({
+        where: {
+          licenseId: license.id,
+          hardwareFingerprint: body.hardware_fingerprint,
+          isActive: true,
+        },
+      });
 
-    // Decrement count
-    const newCount = Math.max(0, license.currentActivations - 1);
-    await prisma.license.update({
-      where: { id: license.id },
-      data: { currentActivations: newCount },
+      if (!activation) {
+        throw new AppError(404, "No active activation found for this machine", "ACTIVATION_NOT_FOUND");
+      }
+
+      await tx.licenseActivation.update({
+        where: { id: activation.id },
+        data: {
+          isActive: false,
+          deactivatedAt: new Date(),
+        },
+      });
+
+      await tx.license.update({
+        where: { id: license.id },
+        data: { currentActivations: { decrement: 1 } },
+      });
+
+      return { license, activation };
     });
 
     await logLicenseEvent({
-      licenseId: license.id,
-      activationId: activation.id,
-      organizationId: license.organizationId,
+      licenseId: result.license.id,
+      activationId: result.activation.id,
+      organizationId: result.license.organizationId,
       action: "deactivated",
       actorType: "desktop_app",
       actorIp: (req.ip || req.socket.remoteAddress) ?? null,
@@ -559,6 +591,25 @@ heartbeatHandler.post("/", async (req: Request, res: Response, next: NextFunctio
   try {
     const body = heartbeatSchema.parse(req.body);
 
+    // Validate license exists before storing heartbeat
+    const license = await prisma.license.findUnique({
+      where: { licenseKey: body.license_key },
+    });
+
+    if (!license) {
+      res.status(404).json(desktopResponse(false, null, "LICENSE_NOT_FOUND", "License not found"));
+      return;
+    }
+
+    if (license.status === "revoked") {
+      res.status(403).json(desktopResponse(false, null, "LICENSE_REVOKED", "This license has been revoked by the administrator."));
+      return;
+    }
+    if (license.status === "suspended") {
+      res.status(403).json(desktopResponse(false, null, "LICENSE_SUSPENDED", "This license has been temporarily suspended. Contact your administrator."));
+      return;
+    }
+
     // Store heartbeat
     await prisma.heartbeat.create({
       data: {
@@ -573,23 +624,17 @@ heartbeatHandler.post("/", async (req: Request, res: Response, next: NextFunctio
     });
 
     // Update last heartbeat on activation
-    const license = await prisma.license.findUnique({
-      where: { licenseKey: body.license_key },
+    await prisma.licenseActivation.updateMany({
+      where: {
+        licenseId: license.id,
+        hardwareFingerprint: body.hardware_fingerprint,
+        isActive: true,
+      },
+      data: {
+        lastHeartbeatAt: new Date(),
+        appVersion: body.app_version ?? undefined,
+      },
     });
-
-    if (license) {
-      await prisma.licenseActivation.updateMany({
-        where: {
-          licenseId: license.id,
-          hardwareFingerprint: body.hardware_fingerprint,
-          isActive: true,
-        },
-        data: {
-          lastHeartbeatAt: new Date(),
-          appVersion: body.app_version ?? undefined,
-        },
-      });
-    }
 
     // Response MUST match Rust HeartbeatResponse struct (NOT ServerResponse!):
     // { success: bool, announcements: Vec<String>, commands: Vec<String>, update_available: Option<UpdateInfo> }
@@ -609,8 +654,10 @@ heartbeatHandler.post("/", async (req: Request, res: Response, next: NextFunctio
 
     res.json({
       success: true,
+      license_status: license.status,
       announcements: heartbeatAnnouncements.map((a: any) => a.message),
-      commands: [],
+      commands: license.status === "revoked" ? ["force_deactivate"] :
+                license.status === "suspended" ? ["block_new_operations"] : [],
       update_available: null,
     });
   } catch (err) {
@@ -648,8 +695,13 @@ heartbeatHandler.post("/", async (req: Request, res: Response, next: NextFunctio
  *                       format: date-time
  */
 export const healthHandler = Router();
-healthHandler.get("/", (_req: Request, res: Response) => {
-  res.json(desktopResponse(true, { status: "ok", timestamp: new Date().toISOString() }, null, "Server is healthy"));
+healthHandler.get("/", async (_req: Request, res: Response) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json(desktopResponse(true, { status: "ok", database: "connected", timestamp: new Date().toISOString() }, null, "Server is healthy"));
+  } catch {
+    res.status(503).json(desktopResponse(false, { status: "degraded", database: "disconnected", timestamp: new Date().toISOString() }, "DB_ERROR", "Database unreachable"));
+  }
 });
 
 // ─── GET /announcements (mounted at /api/v1/announcements) ─────────────────
@@ -702,6 +754,7 @@ announcementsPublicHandler.get("/", async (req: Request, res: Response, next: Ne
         OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
       },
       orderBy: [{ priority: "desc" }, { startsAt: "desc" }],
+      take: 50,
       select: {
         id: true,
         title: true,
@@ -798,13 +851,17 @@ announcementsPublicHandler.get("/", async (req: Request, res: Response, next: Ne
 export const updateCheckHandler = Router();
 updateCheckHandler.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const target = (req.query.target as string) || "windows";
-    const arch = (req.query.arch as string) || "x86_64";
-    const currentVersion = req.query.current_version as string | undefined;
-    const licenseKey = (req.headers["x-license-key"] as string) || (req.query.license_key as string) || null;
-    const fingerprint = (req.headers["x-hardware-fingerprint"] as string) || (req.query.hardware_fingerprint as string) || null;
+    const target = String(req.query.target || "windows").slice(0, 30);
+    const arch = String(req.query.arch || "x86_64").slice(0, 30);
+    const currentVersion = typeof req.query.current_version === "string" ? req.query.current_version.slice(0, 30) : undefined;
+    const licenseKey = (typeof req.headers["x-license-key"] === "string" ? req.headers["x-license-key"].slice(0, 50) : null)
+      || (typeof req.query.license_key === "string" ? (req.query.license_key as string).slice(0, 50) : null);
+    const fingerprint = (typeof req.headers["x-hardware-fingerprint"] === "string" ? req.headers["x-hardware-fingerprint"].slice(0, 512) : null)
+      || (typeof req.query.hardware_fingerprint === "string" ? (req.query.hardware_fingerprint as string).slice(0, 512) : null);
     // Clients send X-App-Channel to opt into beta/nightly releases; default to stable
-    const channel = (req.headers["x-app-channel"] as string) || "stable";
+    const validChannels = ["stable", "beta", "nightly"];
+    const rawChannel = (typeof req.headers["x-app-channel"] === "string" ? req.headers["x-app-channel"] : "stable");
+    const channel = validChannels.includes(rawChannel) ? rawChannel : "stable";
 
     // Check if the client's current version is blocked (force-downgrade / force-update)
     if (currentVersion) {

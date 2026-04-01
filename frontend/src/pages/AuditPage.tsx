@@ -386,8 +386,8 @@ export function AuditPage() {
       adminUser: log.adminUser ? { name: log.adminUser.name } : null,
       ipAddress: log.ipAddress || "",
       userAgent: log.userAgent || "",
-      oldValues: (log.metadata as Record<string, unknown>) ?? null,
-      newValues: (log.metadata as Record<string, unknown>) ?? null,
+      oldValues: log.metadata?.oldValues ?? null,
+      newValues: log.metadata?.newValues ?? null,
       createdAt: log.createdAt,
     }));
   }, [auditLogs]);

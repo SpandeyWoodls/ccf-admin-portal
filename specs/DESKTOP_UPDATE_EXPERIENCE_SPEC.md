@@ -1030,11 +1030,11 @@ The admin portal's `/api/public/v1/update-check` endpoint (and the existing `upd
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
-      "url": "https://releases.cyberchakra.in/2.1.0/CMF-2.1.0-setup.exe"
+      "url": "https://cyberchakra.online/2.1.0/CMF-2.1.0-setup.exe"
     },
     "linux-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6...",
-      "url": "https://releases.cyberchakra.in/2.1.0/CMF-2.1.0.AppImage"
+      "url": "https://cyberchakra.online/2.1.0/CMF-2.1.0.AppImage"
     }
   }
 }
@@ -1161,7 +1161,7 @@ await relaunch();
 
 The `check()` function internally sends a GET request to the endpoint configured in `tauri.conf.json`:
 ```
-GET https://license.cyberchakra.in/api/update-check.php?target=windows&arch=x86_64&current_version=2.0.0
+GET https://cyberchakra.online/api/update-check.php?target=windows&arch=x86_64&current_version=2.0.0
 ```
 
 Returns 200 + JSON if update available, 204 if up-to-date.

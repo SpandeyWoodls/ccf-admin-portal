@@ -32,16 +32,16 @@ Development (dev)
   Purpose:   Daily developer workflow, hot-reload, disposable data
 
 Staging (staging)
-  Host:      admin-staging.cyberchakra.in
-  Frontend:  https://admin-staging.cyberchakra.in  (static files in public_html)
-  Backend:   https://admin-staging.cyberchakra.in/api  (Node.js on port 3002)
+  Host:      staging.cyberchakra.online
+  Frontend:  https://staging.cyberchakra.online  (static files in public_html)
+  Backend:   https://staging.cyberchakra.online/api  (Node.js on port 3002)
   Database:  Hostinger MySQL           (ccf_admin_staging)
   Purpose:   QA testing, desktop app integration testing, pre-production validation
 
 Production (prod)
-  Host:      admin.cyberchakra.in
-  Frontend:  https://admin.cyberchakra.in  (static files in public_html)
-  Backend:   https://admin.cyberchakra.in/api  (Node.js on port 3001)
+  Host:      cyberchakra.online
+  Frontend:  https://cyberchakra.online  (static files in public_html)
+  Backend:   https://cyberchakra.online/api  (Node.js on port 3001)
   Database:  Hostinger MySQL           (ccf_admin_prod)
   Purpose:   Real customer data, live license management, desktop app default endpoint
 ```
@@ -72,14 +72,14 @@ Production (prod)
 | `JWT_EXPIRES_IN` | `24h` | `1h` | `1h` | Longer in dev for convenience |
 | `JWT_REFRESH_EXPIRES_IN` | `30d` | `7d` | `7d` | |
 | `CCF_HMAC_SECRET` | `dev-hmac-secret` | staging HMAC secret | production HMAC secret (matches desktop app) | Must match the HMAC secret compiled into the desktop app build |
-| `CORS_ORIGIN` | `http://localhost:5173` | `https://admin-staging.cyberchakra.in` | `https://admin.cyberchakra.in` | Comma-separated list supported |
-| `VITE_API_URL` | (empty, uses Vite proxy) | `https://admin-staging.cyberchakra.in` | `https://admin.cyberchakra.in` | Frontend build-time variable |
+| `CORS_ORIGIN` | `http://localhost:5173` | `https://staging.cyberchakra.online` | `https://cyberchakra.online` | Comma-separated list supported |
+| `VITE_API_URL` | (empty, uses Vite proxy) | `https://staging.cyberchakra.online` | `https://cyberchakra.online` | Frontend build-time variable |
 | `SMTP_HOST` | (empty or Mailtrap) | `smtp.gmail.com` | `smtp.gmail.com` | Dev can use Mailtrap for email testing |
 | `SMTP_PORT` | `587` | `587` | `587` | |
 | `SMTP_USER` | (empty) | staging email account | production email account | |
 | `SMTP_PASS` | (empty) | staging email password | production email password | |
 | `SMTP_FROM` | `noreply@localhost` | `noreply-staging@cyberchakra.in` | `noreply@cyberchakra.in` | |
-| `PORTAL_URL` | `http://localhost:5173` | `https://admin-staging.cyberchakra.in` | `https://admin.cyberchakra.in` | Used in email templates |
+| `PORTAL_URL` | `http://localhost:5173` | `https://staging.cyberchakra.online` | `https://cyberchakra.online` | Used in email templates |
 | `LOG_LEVEL` | `debug` | `info` | `warn` | Optional; controls request logger verbosity |
 | `FEATURE_FLAGS` | `*` (all enabled) | Configurable via Settings table | Configurable via Settings table | See Section 9 |
 
@@ -200,7 +200,7 @@ npm run db:seed
 
 ### 4.1 Hostinger Configuration
 
-1. **Subdomain**: Create `admin-staging.cyberchakra.in` in hPanel > Domains > Subdomains
+1. **Subdomain**: Create `staging.cyberchakra.online` in hPanel > Domains > Subdomains
 2. **SSL**: Install Let's Encrypt certificate for the staging subdomain
 3. **MySQL Database**: Create a separate database in hPanel > Databases > MySQL Databases
    - Database name: `ccf_admin_staging` (Hostinger will prefix, e.g., `u123456789_ccf_admin_staging`)
@@ -222,7 +222,7 @@ npm run db:seed
       node_modules/
       prisma/
       package.json
-    public_html -> ~/domains/admin-staging.cyberchakra.in/public_html/
+    public_html -> ~/domains/staging.cyberchakra.online/public_html/
   admin-portal/                   # Production deployment (separate)
     backend/
       .env
@@ -253,7 +253,7 @@ CCF_HMAC_SECRET="staging-hmac-secret-for-qa-testing"
 
 # --- Server ---
 PORT=3002
-CORS_ORIGIN="https://admin-staging.cyberchakra.in"
+CORS_ORIGIN="https://staging.cyberchakra.online"
 NODE_ENV="staging"
 
 # --- Email (can use same SMTP but different sender for clarity) ---
@@ -263,7 +263,7 @@ SMTP_SECURE="false"
 SMTP_USER="staging-notifications@cyberchakra.in"
 SMTP_PASS="SMTP_PASSWORD_HERE"
 SMTP_FROM="noreply-staging@cyberchakra.in"
-PORTAL_URL="https://admin-staging.cyberchakra.in"
+PORTAL_URL="https://staging.cyberchakra.online"
 
 # --- Logging ---
 LOG_LEVEL="info"
@@ -271,7 +271,7 @@ LOG_LEVEL="info"
 
 ### 4.4 Staging `.htaccess`
 
-Place at `~/domains/admin-staging.cyberchakra.in/public_html/.htaccess`:
+Place at `~/domains/staging.cyberchakra.online/public_html/.htaccess`:
 
 ```apache
 RewriteEngine On
@@ -443,7 +443,7 @@ Add the script to `backend/package.json`:
 
 ### 5.1 Hostinger Configuration
 
-1. **Subdomain**: `admin.cyberchakra.in` (already documented in `hostinger-deploy.md`)
+1. **Subdomain**: `cyberchakra.online` (already documented in `hostinger-deploy.md`)
 2. **SSL**: Let's Encrypt with Force HTTPS
 3. **MySQL Database**: `ccf_admin_prod` (prefixed by Hostinger)
 4. **Node.js Application**: Port `3001`, startup file `dist/index.js`
@@ -476,7 +476,7 @@ CCF_HMAC_SECRET="<PRODUCTION_HMAC_SECRET_MATCHING_DESKTOP_APP>"
 
 # --- Server ---
 PORT=3001
-CORS_ORIGIN="https://admin.cyberchakra.in"
+CORS_ORIGIN="https://cyberchakra.online"
 NODE_ENV="production"
 
 # --- Email ---
@@ -486,7 +486,7 @@ SMTP_SECURE="false"
 SMTP_USER="notifications@cyberchakra.in"
 SMTP_PASS="PRODUCTION_SMTP_PASSWORD"
 SMTP_FROM="noreply@cyberchakra.in"
-PORTAL_URL="https://admin.cyberchakra.in"
+PORTAL_URL="https://cyberchakra.online"
 
 # --- Logging ---
 LOG_LEVEL="warn"
@@ -553,7 +553,7 @@ git commit -m "db: add field X to table Y"
 # The deploy workflow runs: npx prisma db push
 
 # 6. Verify on staging
-curl https://admin-staging.cyberchakra.in/api/v1/health
+curl https://staging.cyberchakra.online/api/v1/health
 
 # 7. Deploy to production (manual workflow_dispatch)
 # Pre-step: SSH into server and backup the database
@@ -631,7 +631,7 @@ The desktop app (Tauri/Rust) reads its license server URL from two sources:
    impl Default for LicenseServerConfig {
        fn default() -> Self {
            Self {
-               base_url: "https://license.cyberchakra.in/api".to_string(),
+               base_url: "https://cyberchakra.online/api".to_string(),
                api_key: None,
            }
        }
@@ -641,8 +641,8 @@ The desktop app (Tauri/Rust) reads its license server URL from two sources:
 2. **Runtime config** in `config/version.json`:
    ```json
    {
-     "license_server": "https://license.cyberchakra.in/api",
-     "update_endpoint": "https://license.cyberchakra.in/api/update-check.php"
+     "license_server": "https://cyberchakra.online/api",
+     "update_endpoint": "https://cyberchakra.online/api/update-check.php"
    }
    ```
 
@@ -656,12 +656,12 @@ Add an environment override to `LicenseServerConfig` that reads from a local con
 {
   "environments": {
     "production": {
-      "license_server": "https://admin.cyberchakra.in/api",
-      "update_endpoint": "https://admin.cyberchakra.in/api/v1/update-check"
+      "license_server": "https://cyberchakra.online/api",
+      "update_endpoint": "https://cyberchakra.online/api/v1/update-check"
     },
     "staging": {
-      "license_server": "https://admin-staging.cyberchakra.in/api",
-      "update_endpoint": "https://admin-staging.cyberchakra.in/api/v1/update-check"
+      "license_server": "https://staging.cyberchakra.online/api",
+      "update_endpoint": "https://staging.cyberchakra.online/api/v1/update-check"
     },
     "development": {
       "license_server": "http://localhost:3001/api",
@@ -715,7 +715,7 @@ impl LicenseServerConfig {
 
         // Production default (hardcoded, safe)
         Self {
-            base_url: "https://admin.cyberchakra.in/api".to_string(),
+            base_url: "https://cyberchakra.online/api".to_string(),
             api_key: None,
         }
     }
@@ -749,8 +749,8 @@ pub async fn set_environment_override(
     }
 
     let environments = std::collections::HashMap::from([
-        ("production", "https://admin.cyberchakra.in/api"),
-        ("staging", "https://admin-staging.cyberchakra.in/api"),
+        ("production", "https://cyberchakra.online/api"),
+        ("staging", "https://staging.cyberchakra.online/api"),
         ("development", "http://localhost:3001/api"),
     ]);
 
@@ -924,7 +924,7 @@ jobs:
         run: cd backend && npx prisma generate
 
       - name: Build frontend (staging)
-        run: cd frontend && VITE_API_URL="https://admin-staging.cyberchakra.in" npm run build
+        run: cd frontend && VITE_API_URL="https://staging.cyberchakra.online" npm run build
 
       - name: Build backend
         run: cd backend && npm run build
@@ -961,7 +961,7 @@ jobs:
             cd ~/admin-portal-staging/backend
             npx prisma db push --accept-data-loss=false
             # Copy frontend to staging subdomain document root
-            cp -r ~/admin-portal-staging/public_html/* ~/domains/admin-staging.cyberchakra.in/public_html/
+            cp -r ~/admin-portal-staging/public_html/* ~/domains/staging.cyberchakra.online/public_html/
             # Restart staging Node.js process
             npx pm2 restart ccf-admin-staging 2>/dev/null || npx pm2 start dist/index.js --name ccf-admin-staging
             echo "Staging deployment complete"
@@ -969,7 +969,7 @@ jobs:
       - name: Verify staging health
         run: |
           sleep 10
-          curl -sf https://admin-staging.cyberchakra.in/api/v1/health || echo "WARNING: Staging health check failed"
+          curl -sf https://staging.cyberchakra.online/api/v1/health || echo "WARNING: Staging health check failed"
 ```
 
 ### 8.3 Updated Deploy Workflow (Production Only)
@@ -1026,7 +1026,7 @@ jobs:
           cd ../backend && npx tsc --noEmit
 
       - name: Build frontend (production)
-        run: cd frontend && VITE_API_URL="https://admin.cyberchakra.in" npm run build
+        run: cd frontend && VITE_API_URL="https://cyberchakra.online" npm run build
 
       - name: Build backend
         run: cd backend && npm run build
@@ -1052,7 +1052,7 @@ jobs:
             mkdir -p ~/backups/deploys
             # Backup current production
             cp -r ~/admin-portal/backend/dist ~/backups/deploys/backend_${TIMESTAMP} 2>/dev/null || true
-            cp -r ~/domains/admin.cyberchakra.in/public_html ~/backups/deploys/frontend_${TIMESTAMP} 2>/dev/null || true
+            cp -r ~/domains/cyberchakra.online/public_html ~/backups/deploys/frontend_${TIMESTAMP} 2>/dev/null || true
             # Database backup
             mysqldump -u ${{ secrets.PROD_DB_USER }} -p'${{ secrets.PROD_DB_PASS }}' ${{ secrets.PROD_DB_NAME }} \
               --single-transaction | gzip > ~/backups/deploys/db_${TIMESTAMP}.sql.gz
@@ -1077,14 +1077,14 @@ jobs:
           script: |
             cd ~/admin-portal/backend
             npx prisma db push --accept-data-loss=false
-            cp -r ~/admin-portal/public_html/* ~/domains/admin.cyberchakra.in/public_html/
+            cp -r ~/admin-portal/public_html/* ~/domains/cyberchakra.online/public_html/
             npx pm2 restart ccf-admin-backend
             echo "Production deployment complete"
 
       - name: Verify production health
         run: |
           sleep 15
-          HTTP_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" https://admin.cyberchakra.in/api/v1/health)
+          HTTP_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" https://cyberchakra.online/api/v1/health)
           if [ "$HTTP_STATUS" != "200" ]; then
             echo "CRITICAL: Production health check returned $HTTP_STATUS"
             exit 1
@@ -1573,7 +1573,7 @@ Add to the CI workflow before deployment steps:
 
 ```bash
 # 1. Verify staging is healthy
-curl -sf https://admin-staging.cyberchakra.in/api/v1/health | jq .
+curl -sf https://staging.cyberchakra.online/api/v1/health | jq .
 
 # 2. Check the commit on staging matches what you want to deploy
 ssh u123456789@host "cd ~/admin-portal-staging && git log --oneline -3"
@@ -1586,10 +1586,10 @@ ssh u123456789@host "cd ~/admin-portal-staging && git log --oneline -3"
 # 4. Monitor the workflow run in GitHub Actions
 
 # 5. After deployment completes, verify production
-curl -sf https://admin.cyberchakra.in/api/v1/health | jq .
+curl -sf https://cyberchakra.online/api/v1/health | jq .
 
 # 6. Smoke test: log into the admin portal
-#    - Navigate to https://admin.cyberchakra.in
+#    - Navigate to https://cyberchakra.online
 #    - Log in with admin credentials
 #    - Check dashboard loads
 #    - Check license list loads
@@ -1620,7 +1620,7 @@ TIMESTAMP="20260328_143000"  # Use the actual timestamp
 cp -r ~/backups/deploys/backend_${TIMESTAMP}/* ~/admin-portal/backend/dist/
 
 # 4. Restore frontend
-cp -r ~/backups/deploys/frontend_${TIMESTAMP}/* ~/domains/admin.cyberchakra.in/public_html/
+cp -r ~/backups/deploys/frontend_${TIMESTAMP}/* ~/domains/cyberchakra.online/public_html/
 
 # 5. Restore database (if schema was changed)
 gunzip < ~/backups/deploys/db_${TIMESTAMP}.sql.gz | mysql -u USER -p DB_NAME
@@ -1630,7 +1630,7 @@ cd ~/admin-portal/backend
 npx pm2 restart ccf-admin-backend
 
 # 7. Verify
-curl -sf https://admin.cyberchakra.in/api/v1/health
+curl -sf https://cyberchakra.online/api/v1/health
 ```
 
 ---

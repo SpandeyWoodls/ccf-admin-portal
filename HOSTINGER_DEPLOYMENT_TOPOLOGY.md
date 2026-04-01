@@ -27,9 +27,9 @@
 ### 1.1 Domain Layout
 
 ```
-cyberchakra.in              --> Main website (hosted elsewhere / same Hostinger or any provider)
-admin.cyberchakra.in        --> Admin Portal (React SPA + Node.js API) -- Hostinger
-license.cyberchakra.in      --> Backward-compat CNAME for desktop app v1.x -- Hostinger
+cyberchakra.online          --> Main website (hosted elsewhere / same Hostinger or any provider)
+cyberchakra.online        --> Admin Portal (React SPA + Node.js API) -- Hostinger
+cyberchakra.online      --> Backward-compat CNAME for desktop app v1.x -- Hostinger
 ```
 
 ### 1.2 Decision: Same Hostinger Site vs. Separate
@@ -38,30 +38,30 @@ license.cyberchakra.in      --> Backward-compat CNAME for desktop app v1.x -- Ho
 
 Rationale:
 - Hostinger Start Cloud Hosting includes **1 website** with **unlimited subdomains** on the same account.
-- Both `admin.cyberchakra.in` and `license.cyberchakra.in` must reach the same Node.js backend (port 3001). Running two separate Node.js processes on Start Cloud would require two separate hosting plans.
-- `license.cyberchakra.in` is a pure backward-compatibility alias -- its `.htaccess` rewrites all traffic to the same `/api/v1/` endpoints. It does NOT need its own codebase.
+- Both `cyberchakra.online` and `cyberchakra.online` must reach the same Node.js backend (port 3001). Running two separate Node.js processes on Start Cloud would require two separate hosting plans.
+- `cyberchakra.online` is a pure backward-compatibility alias -- its `.htaccess` rewrites all traffic to the same `/api/v1/` endpoints. It does NOT need its own codebase.
 - Hostinger Start Cloud does not allow multiple independent sites. Subdomains share the same `public_html` or get their own directory under `~/domains/`.
 
 Architecture decision:
-- `admin.cyberchakra.in` = primary subdomain, serves the React SPA and proxies API requests to Node.js.
-- `license.cyberchakra.in` = secondary subdomain, has a minimal `.htaccess` that rewrites all PHP paths to the Node.js API via `admin.cyberchakra.in`. No SPA files needed.
+- `cyberchakra.online` = primary subdomain, serves the React SPA and proxies API requests to Node.js.
+- `cyberchakra.online` = secondary subdomain, has a minimal `.htaccess` that rewrites all PHP paths to the Node.js API via `cyberchakra.online`. No SPA files needed.
 
 ### 1.3 DNS Configuration (at Domain Registrar)
 
-The domain `cyberchakra.in` must have its nameservers pointed to Hostinger, OR you manage DNS externally and add these records:
+The domain `cyberchakra.online` must have its nameservers pointed to Hostinger, OR you manage DNS externally and add these records:
 
 ```dns
 ; --- Option A: If using Hostinger DNS (nameservers pointed to Hostinger) ---
 ; Managed in hPanel > Domains > DNS Zone Editor
 
-admin.cyberchakra.in.     CNAME   cloud-xfer.hostinger.com.     ; or the A record IP from hPanel
-license.cyberchakra.in.   CNAME   cloud-xfer.hostinger.com.
+cyberchakra.online.     CNAME   cloud-xfer.hostinger.com.     ; or the A record IP from hPanel
+cyberchakra.online.   CNAME   cloud-xfer.hostinger.com.
 
 ; --- Option B: If using external DNS (Cloudflare, Route53, etc.) ---
 ; Point to the Hostinger server IP directly
 
-admin.cyberchakra.in.     A       <HOSTINGER_SERVER_IP>
-license.cyberchakra.in.   A       <HOSTINGER_SERVER_IP>
+cyberchakra.online.     A       <HOSTINGER_SERVER_IP>
+cyberchakra.online.   A       <HOSTINGER_SERVER_IP>
 ```
 
 **To find the Hostinger server IP:**
@@ -71,19 +71,19 @@ license.cyberchakra.in.   A       <HOSTINGER_SERVER_IP>
 
 ### 1.4 Subdomain Setup in hPanel
 
-**Step-by-step for `admin.cyberchakra.in`:**
+**Step-by-step for `cyberchakra.online`:**
 
 1. Log into hPanel > select your Cloud Hosting plan
 2. Go to **Domains** > **Subdomains** (left sidebar)
 3. Enter `admin` in the subdomain field
-4. The document root auto-fills to `domains/admin.cyberchakra.in/public_html`
+4. The document root auto-fills to `domains/cyberchakra.online/public_html`
 5. Click **Create**
 6. Wait 2-5 minutes for DNS propagation within Hostinger
 
-**Step-by-step for `license.cyberchakra.in`:**
+**Step-by-step for `cyberchakra.online`:**
 
 1. Same process: enter `license` in the subdomain field
-2. Document root auto-fills to `domains/license.cyberchakra.in/public_html`
+2. Document root auto-fills to `domains/cyberchakra.online/public_html`
 3. Click **Create**
 
 ### 1.5 SSL Certificates
@@ -94,7 +94,7 @@ Hostinger provides free Let's Encrypt SSL for all subdomains on Cloud Hosting pl
 
 1. In hPanel, go to **Security** > **SSL**
 2. You should see all your subdomains listed
-3. For each (`admin.cyberchakra.in` and `license.cyberchakra.in`):
+3. For each (`cyberchakra.online` and `cyberchakra.online`):
    - Click **Install** or **Set up** next to the subdomain
    - Select **Let's Encrypt (free)**
    - Wait up to 10 minutes for certificate issuance
@@ -103,7 +103,7 @@ Hostinger provides free Let's Encrypt SSL for all subdomains on Cloud Hosting pl
 **SSL Notes:**
 - Let's Encrypt certificates auto-renew every 90 days; Hostinger handles this automatically.
 - If DNS propagation has not completed, SSL install will fail. Wait and retry.
-- Wildcard SSL (`*.cyberchakra.in`) is available on Business Cloud and above plans. On Start Cloud, each subdomain gets its own certificate.
+- Wildcard SSL (`*.cyberchakra.online`) is available on Business Cloud and above plans. On Start Cloud, each subdomain gets its own certificate.
 
 ---
 
@@ -115,7 +115,7 @@ Hostinger provides free Let's Encrypt SSL for all subdomains on Cloud Hosting pl
 /home/<username>/                       # ~ (home directory)
 │
 ├── domains/
-│   ├── admin.cyberchakra.in/
+│   ├── cyberchakra.online/
 │   │   └── public_html/                # Document root for admin subdomain
 │   │       ├── index.html              # React SPA entry point
 │   │       ├── favicon.svg
@@ -125,7 +125,7 @@ Hostinger provides free Let's Encrypt SSL for all subdomains on Cloud Hosting pl
 │   │       │   └── vendor-[hash].js
 │   │       └── .htaccess               # SPA routing + API proxy + security
 │   │
-│   └── license.cyberchakra.in/
+│   └── cyberchakra.online/
 │       └── public_html/                # Document root for legacy subdomain
 │           └── .htaccess               # ONLY rewrites -- no SPA files
 │
@@ -177,8 +177,8 @@ Hostinger provides free Let's Encrypt SSL for all subdomains on Cloud Hosting pl
 
 | Purpose                        | Absolute Path                                                     |
 |-------------------------------|-------------------------------------------------------------------|
-| Admin SPA document root       | `/home/<username>/domains/admin.cyberchakra.in/public_html/`      |
-| Legacy subdomain doc root     | `/home/<username>/domains/license.cyberchakra.in/public_html/`    |
+| Admin SPA document root       | `/home/<username>/domains/cyberchakra.online/public_html/`      |
+| Legacy subdomain doc root     | `/home/<username>/domains/cyberchakra.online/public_html/`    |
 | Node.js app entry point       | `/home/<username>/admin-portal/backend/dist/index.js`             |
 | Production `.env`             | `/home/<username>/admin-portal/backend/.env`                      |
 | Prisma schema                 | `/home/<username>/admin-portal/backend/prisma/schema.prisma`      |
@@ -193,14 +193,14 @@ Hostinger provides free Let's Encrypt SSL for all subdomains on Cloud Hosting pl
 
 Hostinger Cloud Hosting uses **LiteSpeed Web Server** (not Apache/Nginx), but LiteSpeed is fully compatible with `.htaccess` directives. All configuration is done via `.htaccess` files in the document root.
 
-### 3.1 Primary `.htaccess` -- `admin.cyberchakra.in`
+### 3.1 Primary `.htaccess` -- `cyberchakra.online`
 
-This file goes in `/home/<username>/domains/admin.cyberchakra.in/public_html/.htaccess`:
+This file goes in `/home/<username>/domains/cyberchakra.online/public_html/.htaccess`:
 
 ```apache
 # =============================================================================
 # CCF Admin Portal - LiteSpeed Configuration
-# Deployed to: admin.cyberchakra.in
+# Deployed to: cyberchakra.online
 # =============================================================================
 # Handles five responsibilities:
 #   1. HTTPS enforcement
@@ -245,7 +245,7 @@ RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
 
     # Content Security Policy
     # Adjust 'connect-src' if the API is on a different origin
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://admin.cyberchakra.in; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://cyberchakra.online; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 </IfModule>
 
 # ---------------------------------------------------------------------------
@@ -367,17 +367,17 @@ RewriteRule . /index.html [L]
 </FilesMatch>
 ```
 
-### 3.2 Legacy Subdomain `.htaccess` -- `license.cyberchakra.in`
+### 3.2 Legacy Subdomain `.htaccess` -- `cyberchakra.online`
 
-This file goes in `/home/<username>/domains/license.cyberchakra.in/public_html/.htaccess`:
+This file goes in `/home/<username>/domains/cyberchakra.online/public_html/.htaccess`:
 
 ```apache
 # =============================================================================
 # License Server Backward Compatibility
-# Deployed to: license.cyberchakra.in
+# Deployed to: cyberchakra.online
 # =============================================================================
-# Desktop app v1.x calls license.cyberchakra.in/api/*.php
-# This .htaccess redirects ALL requests to admin.cyberchakra.in
+# Desktop app v1.x calls cyberchakra.online/api/*.php
+# This .htaccess redirects ALL requests to cyberchakra.online
 # which hosts the actual Node.js API.
 # =============================================================================
 
@@ -387,34 +387,34 @@ RewriteEngine On
 RewriteCond %{HTTPS} off
 RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
 
-# ---- Redirect all /api/* paths to admin.cyberchakra.in ----
-# The desktop app sends requests to license.cyberchakra.in/api/activate.php etc.
+# ---- Redirect all /api/* paths to cyberchakra.online ----
+# The desktop app sends requests to cyberchakra.online/api/activate.php etc.
 # We redirect them (301 permanent) to the new admin portal, which handles
 # the .php -> /api/v1/ rewrite internally.
 
 # License endpoints
-RewriteRule ^api/activate\.php$           https://admin.cyberchakra.in/api/v1/license/activate [R=307,L,QSA]
-RewriteRule ^api/validate\.php$           https://admin.cyberchakra.in/api/v1/license/validate [R=307,L,QSA]
-RewriteRule ^api/deactivate\.php$         https://admin.cyberchakra.in/api/v1/license/deactivate [R=307,L,QSA]
+RewriteRule ^api/activate\.php$           https://cyberchakra.online/api/v1/license/activate [R=307,L,QSA]
+RewriteRule ^api/validate\.php$           https://cyberchakra.online/api/v1/license/validate [R=307,L,QSA]
+RewriteRule ^api/deactivate\.php$         https://cyberchakra.online/api/v1/license/deactivate [R=307,L,QSA]
 
 # System
-RewriteRule ^api/heartbeat\.php$          https://admin.cyberchakra.in/api/v1/heartbeat [R=307,L,QSA]
-RewriteRule ^api/health\.php$             https://admin.cyberchakra.in/api/v1/health [R=307,L,QSA]
-RewriteRule ^api/announcements\.php$      https://admin.cyberchakra.in/api/v1/announcements [R=307,L,QSA]
-RewriteRule ^api/update-check\.php$       https://admin.cyberchakra.in/api/v1/update-check [R=307,L,QSA]
+RewriteRule ^api/heartbeat\.php$          https://cyberchakra.online/api/v1/heartbeat [R=307,L,QSA]
+RewriteRule ^api/health\.php$             https://cyberchakra.online/api/v1/health [R=307,L,QSA]
+RewriteRule ^api/announcements\.php$      https://cyberchakra.online/api/v1/announcements [R=307,L,QSA]
+RewriteRule ^api/update-check\.php$       https://cyberchakra.online/api/v1/update-check [R=307,L,QSA]
 
 # Trial
-RewriteRule ^api/trial-request\.php$      https://admin.cyberchakra.in/api/v1/trial-request [R=307,L,QSA]
-RewriteRule ^api/trial-request-status\.php$ https://admin.cyberchakra.in/api/v1/trial-request-status [R=307,L,QSA]
+RewriteRule ^api/trial-request\.php$      https://cyberchakra.online/api/v1/trial-request [R=307,L,QSA]
+RewriteRule ^api/trial-request-status\.php$ https://cyberchakra.online/api/v1/trial-request-status [R=307,L,QSA]
 
 # Support
-RewriteRule ^api/support/(.*)\.php$       https://admin.cyberchakra.in/api/v1/support/$1 [R=307,L,QSA]
+RewriteRule ^api/support/(.*)\.php$       https://cyberchakra.online/api/v1/support/$1 [R=307,L,QSA]
 
 # Catch-all: redirect any other API request to admin portal
-RewriteRule ^api/(.*)$                    https://admin.cyberchakra.in/api/$1 [R=307,L,QSA]
+RewriteRule ^api/(.*)$                    https://cyberchakra.online/api/$1 [R=307,L,QSA]
 
 # Non-API requests: redirect to the admin portal homepage
-RewriteRule ^(.*)$                        https://admin.cyberchakra.in/$1 [R=301,L]
+RewriteRule ^(.*)$                        https://cyberchakra.online/$1 [R=301,L]
 ```
 
 **Why 307 for POST endpoints (not 301/302):**
@@ -425,10 +425,10 @@ HTTP 307 preserves the original HTTP method. A 301/302 redirect causes browsers 
 LiteSpeed serves static files directly from the document root without involving Node.js:
 
 ```
-Request: GET https://admin.cyberchakra.in/assets/index-abc123.js
+Request: GET https://cyberchakra.online/assets/index-abc123.js
    |
    v
-LiteSpeed checks: /home/<username>/domains/admin.cyberchakra.in/public_html/assets/index-abc123.js
+LiteSpeed checks: /home/<username>/domains/cyberchakra.online/public_html/assets/index-abc123.js
    |
    +--> File exists? YES --> Serve directly (fast, no proxy overhead)
    |
@@ -437,7 +437,7 @@ LiteSpeed checks: /home/<username>/domains/admin.cyberchakra.in/public_html/asse
 
 For API requests:
 ```
-Request: POST https://admin.cyberchakra.in/api/v1/license/activate
+Request: POST https://cyberchakra.online/api/v1/license/activate
    |
    v
 LiteSpeed matches: RewriteRule ^api/(.*)$ http://127.0.0.1:3001/api/$1 [P,L]
@@ -608,7 +608,7 @@ CCF_HMAC_SECRET="<your-production-hmac-secret>"
 
 # --- Server ---
 PORT=3001
-CORS_ORIGIN="https://admin.cyberchakra.in"
+CORS_ORIGIN="https://cyberchakra.online"
 NODE_ENV="production"
 
 # --- Email (SMTP via Hostinger) ---
@@ -986,7 +986,7 @@ Cron Expression: */5 * * * *
 ```
 
 ```bash
-curl -sf https://admin.cyberchakra.in/api/v1/health -o /dev/null || echo "[$(date -Iseconds)] HEALTH CHECK FAILED" >> /home/<username>/logs/cron/healthcheck.log
+curl -sf https://cyberchakra.online/api/v1/health -o /dev/null || echo "[$(date -Iseconds)] HEALTH CHECK FAILED" >> /home/<username>/logs/cron/healthcheck.log
 ```
 
 #### Job 6: Stale Activation Cleanup (Weekly, Sunday 4:00 AM IST)
@@ -1084,8 +1084,8 @@ set -euo pipefail
 
 # Configuration
 APP_DIR="/home/<username>/admin-portal"
-ADMIN_PUBLIC="/home/<username>/domains/admin.cyberchakra.in/public_html"
-LICENSE_PUBLIC="/home/<username>/domains/license.cyberchakra.in/public_html"
+ADMIN_PUBLIC="/home/<username>/domains/cyberchakra.online/public_html"
+LICENSE_PUBLIC="/home/<username>/domains/cyberchakra.online/public_html"
 BACKUP_DIR="/home/<username>/backups/app"
 NODE_BIN="/home/<username>/nodevenv/admin-portal/backend/20/bin/node"
 NPM_BIN="/home/<username>/nodevenv/admin-portal/backend/20/bin/npm"
@@ -1130,7 +1130,7 @@ npx prisma generate
 echo ""
 echo "[5/8] Building frontend..."
 cd "$APP_DIR/frontend"
-echo 'VITE_API_URL="https://admin.cyberchakra.in"' > .env
+echo 'VITE_API_URL="https://cyberchakra.online"' > .env
 $NPM_BIN run build
 
 echo "[5/8] Building backend..."
@@ -1149,7 +1149,7 @@ echo "  Frontend deployed."
 # Ensure license subdomain .htaccess exists
 mkdir -p "$LICENSE_PUBLIC"
 if [ ! -f "$LICENSE_PUBLIC/.htaccess" ]; then
-    echo "  Creating license.cyberchakra.in .htaccess..."
+    echo "  Creating cyberchakra.online .htaccess..."
     # This will be created separately -- see Section 3.2
 fi
 
@@ -1182,7 +1182,7 @@ echo "  Post-Deployment Verification"
 echo "============================================"
 
 # Health check
-HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" https://admin.cyberchakra.in/api/v1/health 2>/dev/null || echo "000")
+HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" https://cyberchakra.online/api/v1/health 2>/dev/null || echo "000")
 if [ "$HTTP_CODE" = "200" ]; then
     echo "  [PASS] Health endpoint: HTTP 200"
 else
@@ -1192,7 +1192,7 @@ else
 fi
 
 # Frontend check
-HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" https://admin.cyberchakra.in/ 2>/dev/null || echo "000")
+HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" https://cyberchakra.online/ 2>/dev/null || echo "000")
 if [ "$HTTP_CODE" = "200" ]; then
     echo "  [PASS] Frontend: HTTP 200"
 else
@@ -1233,7 +1233,7 @@ npx prisma generate
 
 # 6. Build frontend
 cd ~/admin-portal/frontend
-echo 'VITE_API_URL="https://admin.cyberchakra.in"' > .env
+echo 'VITE_API_URL="https://cyberchakra.online"' > .env
 npm run build
 
 # 7. Build backend
@@ -1241,8 +1241,8 @@ cd ~/admin-portal/backend
 npm run build
 
 # 8. Deploy frontend files
-rsync -a --delete ~/admin-portal/frontend/dist/ ~/domains/admin.cyberchakra.in/public_html/
-cp ~/admin-portal/.htaccess ~/domains/admin.cyberchakra.in/public_html/.htaccess
+rsync -a --delete ~/admin-portal/frontend/dist/ ~/domains/cyberchakra.online/public_html/
+cp ~/admin-portal/.htaccess ~/domains/cyberchakra.online/public_html/.htaccess
 
 # 9. Safe database migration (Prisma db push -- only adds columns/tables)
 cd ~/admin-portal/backend
@@ -1254,7 +1254,7 @@ touch ~/admin-portal/backend/dist/index.js   # hPanel manager restart
 
 # 11. Wait and verify
 sleep 5
-curl -s https://admin.cyberchakra.in/api/v1/health
+curl -s https://cyberchakra.online/api/v1/health
 # Expected: {"success":true,"data":{"status":"ok",...},"error":null}
 ```
 
@@ -1263,7 +1263,7 @@ curl -s https://admin.cyberchakra.in/api/v1/health
 ```bash
 # 1. Restore frontend from backup
 cd ~/backups/app
-tar -xzf public_html_<TIMESTAMP>.tar.gz -C ~/domains/admin.cyberchakra.in/public_html/
+tar -xzf public_html_<TIMESTAMP>.tar.gz -C ~/domains/cyberchakra.online/public_html/
 
 # 2. Restore backend from backup
 tar -xzf backend_dist_<TIMESTAMP>.tar.gz -C ~/admin-portal/backend/dist/
@@ -1308,10 +1308,10 @@ Response format:
 
 | Monitor Name          | Type      | URL                                              | Interval | Alert |
 |-----------------------|-----------|--------------------------------------------------|----------|-------|
-| CCF Admin - API       | HTTP(s)   | `https://admin.cyberchakra.in/api/v1/health`    | 5 min    | Email + Telegram |
-| CCF Admin - Frontend  | HTTP(s)   | `https://admin.cyberchakra.in/`                  | 5 min    | Email + Telegram |
-| CCF License - Compat  | HTTP(s)   | `https://license.cyberchakra.in/api/health.php`  | 5 min    | Email + Telegram |
-| CCF Admin - SSL       | Keyword   | `https://admin.cyberchakra.in/`                  | 24 hr    | Email (SSL expiry) |
+| CCF Admin - API       | HTTP(s)   | `https://cyberchakra.online/api/v1/health`    | 5 min    | Email + Telegram |
+| CCF Admin - Frontend  | HTTP(s)   | `https://cyberchakra.online/`                  | 5 min    | Email + Telegram |
+| CCF License - Compat  | HTTP(s)   | `https://cyberchakra.online/api/health.php`  | 5 min    | Email + Telegram |
+| CCF Admin - SSL       | Keyword   | `https://cyberchakra.online/`                  | 24 hr    | Email (SSL expiry) |
 
 3. Set up alert contacts:
    - Email: admin@cyberchakra.in
@@ -1331,7 +1331,7 @@ Create `/home/<username>/scripts/healthcheck.sh`:
 # Runs as cron every 5 minutes; attempts auto-recovery on failure.
 # =============================================================================
 
-HEALTH_URL="https://admin.cyberchakra.in/api/v1/health"
+HEALTH_URL="https://cyberchakra.online/api/v1/health"
 LOG_FILE="/home/<username>/logs/cron/healthcheck.log"
 TIMESTAMP=$(date -Iseconds)
 
@@ -1455,9 +1455,9 @@ chmod 700 ~/scripts/backup-db.sh
 chmod 700 ~/backups/
 
 # Ensure public_html is readable by the web server
-chmod 755 ~/domains/admin.cyberchakra.in/public_html/
-chmod 644 ~/domains/admin.cyberchakra.in/public_html/.htaccess
-chmod 644 ~/domains/admin.cyberchakra.in/public_html/index.html
+chmod 755 ~/domains/cyberchakra.online/public_html/
+chmod 644 ~/domains/cyberchakra.online/public_html/.htaccess
+chmod 644 ~/domains/cyberchakra.online/public_html/index.html
 ```
 
 ### 9.3 Firewall & IP Restrictions
@@ -1488,12 +1488,12 @@ cors({
 
 For production, set:
 ```
-CORS_ORIGIN="https://admin.cyberchakra.in"
+CORS_ORIGIN="https://cyberchakra.online"
 ```
 
 **If the desktop app needs to make requests from a browser context (unlikely but possible):**
 ```
-CORS_ORIGIN="https://admin.cyberchakra.in,https://license.cyberchakra.in"
+CORS_ORIGIN="https://cyberchakra.online,https://cyberchakra.online"
 ```
 
 ---
@@ -1523,7 +1523,7 @@ CORS_ORIGIN="https://admin.cyberchakra.in,https://license.cyberchakra.in"
 | Item                           | Monthly Cost    |
 |--------------------------------|-----------------|
 | Hostinger Start Cloud (annual) | ~$9.99/mo ($120/yr) |
-| Domain (cyberchakra.in)        | Already owned   |
+| Domain (cyberchakra.online)    | Already owned   |
 | UptimeRobot (free tier)        | $0              |
 | GitHub Actions (free for repo) | $0              |
 | **Total**                      | **~$10/mo (~830 INR/mo)** |
@@ -1549,16 +1549,16 @@ If the portal outgrows Start Cloud:
 PRE-DEPLOYMENT
   [ ] Hostinger Start Cloud Hosting plan purchased
   [ ] SSH access enabled in hPanel
-  [ ] cyberchakra.in DNS pointed to Hostinger (or A records added)
+  [ ] cyberchakra.online DNS pointed to Hostinger (or A records added)
 
 DNS & SUBDOMAINS
-  [ ] admin.cyberchakra.in subdomain created in hPanel
-  [ ] license.cyberchakra.in subdomain created in hPanel
-  [ ] DNS propagation verified (nslookup admin.cyberchakra.in)
+  [ ] cyberchakra.online subdomain created in hPanel
+  [ ] cyberchakra.online subdomain created in hPanel
+  [ ] DNS propagation verified (nslookup cyberchakra.online)
 
 SSL
-  [ ] Let's Encrypt SSL installed for admin.cyberchakra.in
-  [ ] Let's Encrypt SSL installed for license.cyberchakra.in
+  [ ] Let's Encrypt SSL installed for cyberchakra.online
+  [ ] Let's Encrypt SSL installed for cyberchakra.online
   [ ] Force HTTPS enabled for both subdomains
 
 DATABASE
@@ -1583,18 +1583,18 @@ PROJECT FILES
   [ ] Default admin user seeded (npx tsx src/seed.ts)
 
 FRONTEND
-  [ ] Frontend .env set: VITE_API_URL="https://admin.cyberchakra.in"
+  [ ] Frontend .env set: VITE_API_URL="https://cyberchakra.online"
   [ ] Frontend built (npm run build)
-  [ ] Built files copied to ~/domains/admin.cyberchakra.in/public_html/
+  [ ] Built files copied to ~/domains/cyberchakra.online/public_html/
   [ ] .htaccess copied to public_html/
 
 BACKEND
   [ ] Backend built (npm run build in backend/)
   [ ] Node.js application started via hPanel
-  [ ] Health check passing: curl https://admin.cyberchakra.in/api/v1/health
+  [ ] Health check passing: curl https://cyberchakra.online/api/v1/health
 
 LEGACY COMPAT
-  [ ] license.cyberchakra.in .htaccess deployed
+  [ ] cyberchakra.online .htaccess deployed
   [ ] Legacy .php endpoints tested and redirecting correctly
 
 CRON JOBS
@@ -1628,12 +1628,12 @@ SECURITY
   [ ] GitHub secrets configured (HOSTINGER_HOST, HOSTINGER_USER, HOSTINGER_SSH_KEY)
 
 VERIFICATION
-  [ ] Admin portal loads at https://admin.cyberchakra.in/
+  [ ] Admin portal loads at https://cyberchakra.online/
   [ ] Admin login works
   [ ] API health check returns 200
   [ ] Legacy PHP path (activate.php) redirects correctly
   [ ] License activation flow tested end-to-end
-  [ ] license.cyberchakra.in redirects to admin portal
+  [ ] cyberchakra.online redirects to admin portal
 ```
 
 ---
@@ -1646,10 +1646,10 @@ VERIFICATION
 | Blank page at admin portal URL         | Frontend files not in public_html     | `rsync -a frontend/dist/ ~/domains/.../public_html/`   |
 | `.htaccess` not working                | LiteSpeed override not enabled        | Contact Hostinger support to enable AllowOverride All   |
 | `prisma db push` fails                 | Wrong DATABASE_URL or DB not created  | Verify full prefixed DB name and credentials           |
-| SSL certificate not installing         | DNS not yet propagated                | Wait 24h, verify with `nslookup admin.cyberchakra.in`  |
+| SSL certificate not installing         | DNS not yet propagated                | Wait 24h, verify with `nslookup cyberchakra.online`  |
 | Node.js version wrong                  | hPanel Node.js not configured         | Set version 20.x in hPanel > Advanced > Node.js        |
 | Cron jobs not running                  | Wrong node path in cron command       | SSH in, `which node`, update cron command path          |
-| `CORS error` in browser console        | CORS_ORIGIN mismatch                 | Set `CORS_ORIGIN=https://admin.cyberchakra.in` in .env |
+| `CORS error` in browser console        | CORS_ORIGIN mismatch                 | Set `CORS_ORIGIN=https://cyberchakra.online` in .env |
 | `Connection refused` from DB           | MySQL credentials wrong               | Check hPanel for the full prefixed username/dbname      |
 | Legacy .php redirect loses POST body   | Using 301/302 instead of 307         | Use `[R=307,L]` flag in RewriteRule                    |
 | Disk space full                        | Log files or backups accumulating     | Run log rotation, clean old backups                     |
@@ -1692,10 +1692,10 @@ npx prisma generate             # Regenerate client after schema change
 
 # ── Deployment ───────────────────────────────────────────────────
 ~/scripts/deploy.sh             # Full deployment
-rsync -a ~/admin-portal/frontend/dist/ ~/domains/admin.cyberchakra.in/public_html/  # Frontend only
+rsync -a ~/admin-portal/frontend/dist/ ~/domains/cyberchakra.online/public_html/  # Frontend only
 
 # ── Monitoring ───────────────────────────────────────────────────
-curl -s https://admin.cyberchakra.in/api/v1/health | python3 -m json.tool
+curl -s https://cyberchakra.online/api/v1/health | python3 -m json.tool
 tail -f ~/logs/node-app.log
 tail -f ~/logs/cron/healthcheck.log
 

@@ -46,8 +46,11 @@ interface Pagination {
 }
 
 interface TrialListResponse {
-  trials: TrialRequest[];
-  pagination: Pagination;
+  items: TrialRequest[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 interface ApproveResponse {
@@ -99,8 +102,15 @@ export const useTrialStore = create<TrialState>()((set) => ({
         `/api/v1/admin/trials?${params.toString()}`,
       );
       set({
-        trials: Array.isArray(data?.trials) ? data.trials : [],
-        pagination: data?.pagination ?? { ...DEFAULT_PAGINATION },
+        trials: Array.isArray(data?.items) ? data.items : [],
+        pagination: data
+          ? {
+              page: data.page,
+              limit: data.pageSize,
+              total: data.total,
+              totalPages: data.totalPages,
+            }
+          : { ...DEFAULT_PAGINATION },
         isLoading: false,
       });
     } catch (err) {

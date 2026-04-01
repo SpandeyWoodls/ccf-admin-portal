@@ -15,7 +15,7 @@ const options: swaggerJsdoc.Options = {
         "API documentation for Cyber Chakra Forensics Admin Portal. This API serves two audiences: admin dashboard (JWT auth) and desktop application (license key auth).",
       contact: {
         name: "Cyber Chakra Digital Forensics",
-        url: "https://cyberchakra.in",
+        url: "https://cyberchakra.online",
       },
     },
     servers: [

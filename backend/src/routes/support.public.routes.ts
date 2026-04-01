@@ -5,7 +5,7 @@ import { desktopResponse } from "../lib/response.js";
 import { uuidToNumericId } from "../lib/validation-token.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { sendEmail } from "../services/email.js";
-import { ticketReplyEmail } from "../services/email-templates.js";
+import { ticketReplyEmail, ticketConfirmationEmail } from "../services/email-templates.js";
 import { logAudit } from "../lib/audit.js";
 
 const router = Router();
@@ -13,34 +13,34 @@ const router = Router();
 // ─── Schemas ────────────────────────────────────────────────────────────────
 
 const createTicketSchema = z.object({
-  license_key: z.string().min(1),
-  hardware_fingerprint: z.string().optional(),
+  license_key: z.string().min(1).max(50),
+  hardware_fingerprint: z.string().max(512).optional(),
   subject: z.string().min(1).max(512),
-  message: z.string().min(1).optional(),
-  description: z.string().min(1).optional(),
+  message: z.string().min(1).max(10_000).optional(),
+  description: z.string().min(1).max(10_000).optional(),
   category: z.enum(["bug", "feature", "question", "other", "technical", "billing", "license"]).default("other"),
   priority: z.enum(["low", "medium", "high", "critical", "urgent"]).default("medium"),
   sender_name: z.string().min(1).max(255).optional(),
-  sender_email: z.string().email().optional(),
-  app_version: z.string().optional(),
-  system_info: z.string().optional(),
+  sender_email: z.string().email().max(320).optional(),
+  app_version: z.string().max(30).optional(),
+  system_info: z.string().max(2000).optional(),
 });
 
 const ticketStatusSchema = z.object({
-  license_key: z.string().min(1),
-  hardware_fingerprint: z.string().optional(),
-  ticket_number: z.string().optional(),
+  license_key: z.string().min(1).max(50),
+  hardware_fingerprint: z.string().max(512).optional(),
+  ticket_number: z.string().max(50).optional(),
 });
 
 const ticketDetailsSchema = z.object({
-  ticket_number: z.string().min(1),
-  license_key: z.string().min(1),
+  ticket_number: z.string().min(1).max(50),
+  license_key: z.string().min(1).max(50),
 });
 
 const replyTicketSchema = z.object({
-  ticket_number: z.string().min(1),
-  license_key: z.string().min(1),
-  message: z.string().min(1),
+  ticket_number: z.string().min(1).max(50),
+  license_key: z.string().min(1).max(50),
+  message: z.string().min(1).max(10_000),
   sender_name: z.string().min(1).max(255),
 });
 
@@ -94,6 +94,18 @@ router.post("/create-ticket", async (req: Request, res: Response, next: NextFunc
         },
       },
     });
+
+    // Fire-and-forget: send confirmation email to user if email is available
+    const userEmail = body.sender_email;
+    if (userEmail) {
+      const { subject: confirmSubject, html: confirmHtml } = ticketConfirmationEmail(
+        ticket.ticketNumber,
+        body.subject,
+      );
+      sendEmail(userEmail, confirmSubject, confirmHtml).catch(err =>
+        console.error("[Email] Ticket confirmation failed:", err.message),
+      );
+    }
 
     res.status(201).json(
       desktopResponse(true, {
@@ -188,6 +200,7 @@ router.post("/ticket-details", async (req: Request, res: Response, next: NextFun
         messages: {
           where: { isInternal: false },
           orderBy: { createdAt: "asc" },
+          take: 200,
           select: {
             id: true,
             message: true,

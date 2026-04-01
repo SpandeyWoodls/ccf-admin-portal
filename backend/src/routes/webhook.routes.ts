@@ -17,7 +17,7 @@ function requireWebhookAuth(req: Request, _res: Response, next: NextFunction) {
   const expectedToken = process.env.GITHUB_WEBHOOK_SECRET;
 
   if (!expectedToken) {
-    return next(new AppError(500, "Webhook secret not configured on server", "WEBHOOK_NOT_CONFIGURED"));
+    return next(new AppError(500, "Webhook authentication is not configured", "WEBHOOK_NOT_CONFIGURED"));
   }
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {

@@ -224,9 +224,12 @@ router.post("/export", async (req: Request, res: Response, next: NextFunction) =
     if (body.tier) where.tier = body.tier;
     if (body.organizationId) where.organizationId = body.organizationId;
 
+    // Cap export to 10,000 rows to prevent DoS via unbounded queries
+    const EXPORT_LIMIT = 10_000;
     const licenses = await prisma.license.findMany({
       where,
       orderBy: { createdAt: "desc" },
+      take: EXPORT_LIMIT,
       include: {
         organization: { select: { id: true, name: true } },
         _count: { select: { activations: { where: { isActive: true } } } },

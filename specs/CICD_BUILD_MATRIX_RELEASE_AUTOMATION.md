@@ -669,7 +669,7 @@ jobs:
 
           # POST to admin portal release webhook
           HTTP_STATUS=$(curl -s -o /tmp/webhook_response.txt -w "%{http_code}" \
-            -X POST "https://admin.cyberchakra.in/api/v1/webhooks/github-release" \
+            -X POST "https://cyberchakra.online/api/v1/webhooks/github-release" \
             -H "Authorization: Bearer $ADMIN_PORTAL_WEBHOOK_KEY" \
             -H "Content-Type: application/json" \
             -d "{

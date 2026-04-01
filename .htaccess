@@ -31,7 +31,22 @@ RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
     Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
     Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://admin.cyberchakra.in; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    # ── Content Security Policy ──────────────────────────────────────────
+    # NOTES on 'unsafe-inline' in style-src:
+    #   Required by Radix UI, Recharts, and Sonner which inject inline
+    #   style attributes at runtime (40+ occurrences across 10 components).
+    #   Removing it breaks dropdown menus, tooltips, charts, and toasts.
+    #   Mitigated by: no user-controlled CSS injection vectors exist.
+    #
+    # img-src allows data: for inline SVG/base64 icons used by Lucide.
+    #   Restricted to self + data: only (removed blanket https:).
+    #
+    # connect-src restricted to self + explicit production API domain.
+    #
+    # font-src + style-src include Google Fonts domains for Inter font.
+    #
+    # report-uri sends CSP violations to a backend endpoint for monitoring.
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://cyberchakra.online https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests; report-uri /api/v1/csp-report"
 </IfModule>
 
 # ---------------------------------------------------------------------------

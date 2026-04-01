@@ -8,15 +8,21 @@ import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api";
 export interface Announcement {
   id: string;
   title: string;
-  body: string;
-  severity: string;
-  targetAudience: string;
-  isActive: boolean;
-  publishAt: string | null;
+  message: string;
+  announcementType: "info" | "warning" | "critical" | "maintenance";
+  targetOrgIds: string[] | null;
+  targetTiers: string[] | null;
+  targetVersions: string[] | null;
+  actionUrl: string | null;
+  actionLabel: string | null;
+  dismissible: boolean;
+  priority: number;
+  startsAt: string;
   expiresAt: string | null;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  createdBy?: { name: string };
+  createdBy?: { id: string; name: string; email: string } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -33,16 +39,31 @@ interface BackendPaginatedResponse<T> {
 
 // No mock data -- stores return empty arrays on API failure
 
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+const DEFAULT_PAGINATION: Pagination = {
+  page: 1,
+  limit: 20,
+  total: 0,
+  totalPages: 0,
+};
+
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
 interface AnnouncementState {
   announcements: Announcement[];
+  pagination: Pagination;
   isLoading: boolean;
   error: string | null;
 
-  fetchAnnouncements: () => Promise<void>;
+  fetchAnnouncements: (params?: { page?: number; limit?: number }) => Promise<void>;
   createAnnouncement: (
     data: Record<string, unknown>,
   ) => Promise<Announcement>;
@@ -57,16 +78,27 @@ interface AnnouncementState {
 export const useAnnouncementStore = create<AnnouncementState>()(
   (set) => ({
     announcements: [],
+    pagination: { ...DEFAULT_PAGINATION },
     isLoading: false,
     error: null,
 
-    fetchAnnouncements: async () => {
+    fetchAnnouncements: async (params?: { page?: number; limit?: number }) => {
       set({ isLoading: true, error: null });
       try {
+        const qp = new URLSearchParams();
+        if (params?.page) qp.set("page", String(params.page));
+        if (params?.limit) qp.set("pageSize", String(params.limit));
+        const qs = qp.toString();
         const raw = await apiGet<BackendPaginatedResponse<Announcement>>(
-          "/api/v1/admin/announcements",
+          `/api/v1/admin/announcements${qs ? `?${qs}` : ""}`,
         );
-        set({ announcements: raw.items, isLoading: false });
+        set({
+          announcements: raw.items,
+          pagination: raw
+            ? { page: raw.page, limit: raw.pageSize, total: raw.total, totalPages: raw.totalPages }
+            : { ...DEFAULT_PAGINATION },
+          isLoading: false,
+        });
       } catch (err) {
         set({
           announcements: [],
@@ -153,7 +185,7 @@ export const useAnnouncementStore = create<AnnouncementState>()(
     },
 
     reset: () =>
-      set({ announcements: [], isLoading: false, error: null }),
+      set({ announcements: [], pagination: { ...DEFAULT_PAGINATION }, isLoading: false, error: null }),
   }),
 );
 
@@ -166,3 +198,6 @@ export const useAnnouncements = () =>
 
 export const useAnnouncementLoading = () =>
   useAnnouncementStore((s) => s.isLoading);
+
+export const useAnnouncementPagination = () =>
+  useAnnouncementStore((s) => s.pagination);

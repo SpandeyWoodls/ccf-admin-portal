@@ -1,5 +1,5 @@
 # License Server Migration Strategy
-# PHP (license.cyberchakra.in) -> Admin Portal (admin.cyberchakra.in)
+# PHP (cyberchakra.online) -> Admin Portal (cyberchakra.online)
 
 **Date:** 2026-03-28
 **Author:** Agent 13 (License Server Migration Researcher)
@@ -28,16 +28,16 @@
 ```
 Desktop App (Rust/reqwest)
     |
-    | POST https://license.cyberchakra.in/api/activate.php
-    | POST https://license.cyberchakra.in/api/validate.php
-    | POST https://license.cyberchakra.in/api/deactivate.php
-    | POST https://license.cyberchakra.in/api/heartbeat.php
-    | GET  https://license.cyberchakra.in/api/update-check.php
-    | GET  https://license.cyberchakra.in/api/announcements.php
-    | GET  https://license.cyberchakra.in/api/health.php
+    | POST https://cyberchakra.online/api/activate.php
+    | POST https://cyberchakra.online/api/validate.php
+    | POST https://cyberchakra.online/api/deactivate.php
+    | POST https://cyberchakra.online/api/heartbeat.php
+    | GET  https://cyberchakra.online/api/update-check.php
+    | GET  https://cyberchakra.online/api/announcements.php
+    | GET  https://cyberchakra.online/api/health.php
     |
     v
-PHP Server (license.cyberchakra.in)
+PHP Server (cyberchakra.online)
     |
     v
 MySQL/SQLite (PHP server's DB)
@@ -48,15 +48,15 @@ MySQL/SQLite (PHP server's DB)
 ```
 Desktop App (Rust/reqwest)
     |
-    | POST https://admin.cyberchakra.in/api/public/v1/license/activate
-    | POST https://admin.cyberchakra.in/api/public/v1/license/validate
-    | POST https://admin.cyberchakra.in/api/public/v1/license/deactivate
-    | POST https://admin.cyberchakra.in/api/public/v1/heartbeat
-    | POST https://admin.cyberchakra.in/api/public/v1/update-check
-    | GET  https://admin.cyberchakra.in/api/public/v1/announcements
+    | POST https://cyberchakra.online/api/public/v1/license/activate
+    | POST https://cyberchakra.online/api/public/v1/license/validate
+    | POST https://cyberchakra.online/api/public/v1/license/deactivate
+    | POST https://cyberchakra.online/api/public/v1/heartbeat
+    | POST https://cyberchakra.online/api/public/v1/update-check
+    | GET  https://cyberchakra.online/api/public/v1/announcements
     |
     v
-Next.js Admin Portal (admin.cyberchakra.in / Vercel)
+Next.js Admin Portal (cyberchakra.online / Vercel)
     |
     v
 PostgreSQL (Neon)
@@ -67,15 +67,15 @@ PostgreSQL (Neon)
 ```
 Desktop App (Rust/reqwest)
     |
-    | POST https://license.cyberchakra.in/api/activate.php
+    | POST https://cyberchakra.online/api/activate.php
     |
     v
-Nginx/LiteSpeed Reverse Proxy (license.cyberchakra.in)
+Nginx/LiteSpeed Reverse Proxy (cyberchakra.online)
     |
     | Rewrite: /api/activate.php -> /api/public/v1/license/activate
     |
     v
-Next.js Admin Portal (admin.cyberchakra.in)
+Next.js Admin Portal (cyberchakra.online)
     |
     v
 Compatibility Middleware (transforms responses to PHP format)
@@ -94,14 +94,14 @@ PostgreSQL (Neon)
 
 **Steps:**
 
-1. Deploy admin portal to `admin.cyberchakra.in` on Vercel
+1. Deploy admin portal to `cyberchakra.online` on Vercel
 2. Run database schema (`001_database_schema.sql`) on Neon PostgreSQL
 3. Set up admin auth (Clerk), verify admin login works
 4. Implement the public API endpoints that mirror PHP behavior (see Section 3)
 5. Run the data migration (see Section 4) to populate PostgreSQL from PHP DB
 
 **Verification:**
-- Admin can log in to `admin.cyberchakra.in`
+- Admin can log in to `cyberchakra.online`
 - All public API endpoints return correct JSON when tested manually
 - No desktop app traffic touches the new portal yet
 
@@ -109,15 +109,15 @@ PostgreSQL (Neon)
 
 **Goal:** Route desktop app traffic through the new portal via a proxy, with the PHP server as fallback.
 
-**Option A: Nginx Reverse Proxy on license.cyberchakra.in (RECOMMENDED)**
+**Option A: Nginx Reverse Proxy on cyberchakra.online (RECOMMENDED)**
 
-Add these rewrite rules to the Nginx config on the server hosting `license.cyberchakra.in`:
+Add these rewrite rules to the Nginx config on the server hosting `cyberchakra.online`:
 
 ```nginx
-# /etc/nginx/sites-available/license.cyberchakra.in
+# /etc/nginx/sites-available/cyberchakra.online
 
 upstream new_portal {
-    server admin.cyberchakra.in:443;
+    server cyberchakra.online:443;
 }
 
 upstream php_fallback {
@@ -126,7 +126,7 @@ upstream php_fallback {
 
 server {
     listen 443 ssl;
-    server_name license.cyberchakra.in;
+    server_name cyberchakra.online;
 
     # SSL config...
 
@@ -142,8 +142,8 @@ server {
 
     # activate.php -> new portal
     location = /api/activate.php {
-        proxy_pass https://admin.cyberchakra.in/api/compat/v1/license/activate;
-        proxy_set_header Host admin.cyberchakra.in;
+        proxy_pass https://cyberchakra.online/api/compat/v1/license/activate;
+        proxy_set_header Host cyberchakra.online;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_ssl_server_name on;
@@ -161,8 +161,8 @@ server {
 
     # validate.php -> new portal
     location = /api/validate.php {
-        proxy_pass https://admin.cyberchakra.in/api/compat/v1/license/validate;
-        proxy_set_header Host admin.cyberchakra.in;
+        proxy_pass https://cyberchakra.online/api/compat/v1/license/validate;
+        proxy_set_header Host cyberchakra.online;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_ssl_server_name on;
@@ -178,8 +178,8 @@ server {
 
     # deactivate.php -> new portal
     location = /api/deactivate.php {
-        proxy_pass https://admin.cyberchakra.in/api/compat/v1/license/deactivate;
-        proxy_set_header Host admin.cyberchakra.in;
+        proxy_pass https://cyberchakra.online/api/compat/v1/license/deactivate;
+        proxy_set_header Host cyberchakra.online;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_ssl_server_name on;
@@ -195,8 +195,8 @@ server {
 
     # heartbeat.php -> new portal
     location = /api/heartbeat.php {
-        proxy_pass https://admin.cyberchakra.in/api/compat/v1/heartbeat;
-        proxy_set_header Host admin.cyberchakra.in;
+        proxy_pass https://cyberchakra.online/api/compat/v1/heartbeat;
+        proxy_set_header Host cyberchakra.online;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_ssl_server_name on;
@@ -212,8 +212,8 @@ server {
 
     # update-check.php -> new portal
     location = /api/update-check.php {
-        proxy_pass https://admin.cyberchakra.in/api/compat/v1/update-check;
-        proxy_set_header Host admin.cyberchakra.in;
+        proxy_pass https://cyberchakra.online/api/compat/v1/update-check;
+        proxy_set_header Host cyberchakra.online;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_ssl_server_name on;
@@ -229,8 +229,8 @@ server {
 
     # announcements.php -> new portal
     location = /api/announcements.php {
-        proxy_pass https://admin.cyberchakra.in/api/compat/v1/announcements;
-        proxy_set_header Host admin.cyberchakra.in;
+        proxy_pass https://cyberchakra.online/api/compat/v1/announcements;
+        proxy_set_header Host cyberchakra.online;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_ssl_server_name on;
@@ -246,8 +246,8 @@ server {
 
     # health.php -> new portal health endpoint
     location = /api/health.php {
-        proxy_pass https://admin.cyberchakra.in/api/compat/v1/health;
-        proxy_set_header Host admin.cyberchakra.in;
+        proxy_pass https://cyberchakra.online/api/compat/v1/health;
+        proxy_set_header Host cyberchakra.online;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_ssl_server_name on;
@@ -276,25 +276,25 @@ RewriteEngine On
 
 # Phase 2: Proxy to new portal
 RewriteCond %{REQUEST_URI} ^/api/activate\.php$ [NC]
-RewriteRule ^(.*)$ https://admin.cyberchakra.in/api/compat/v1/license/activate [P,L]
+RewriteRule ^(.*)$ https://cyberchakra.online/api/compat/v1/license/activate [P,L]
 
 RewriteCond %{REQUEST_URI} ^/api/validate\.php$ [NC]
-RewriteRule ^(.*)$ https://admin.cyberchakra.in/api/compat/v1/license/validate [P,L]
+RewriteRule ^(.*)$ https://cyberchakra.online/api/compat/v1/license/validate [P,L]
 
 RewriteCond %{REQUEST_URI} ^/api/deactivate\.php$ [NC]
-RewriteRule ^(.*)$ https://admin.cyberchakra.in/api/compat/v1/license/deactivate [P,L]
+RewriteRule ^(.*)$ https://cyberchakra.online/api/compat/v1/license/deactivate [P,L]
 
 RewriteCond %{REQUEST_URI} ^/api/heartbeat\.php$ [NC]
-RewriteRule ^(.*)$ https://admin.cyberchakra.in/api/compat/v1/heartbeat [P,L]
+RewriteRule ^(.*)$ https://cyberchakra.online/api/compat/v1/heartbeat [P,L]
 
 RewriteCond %{REQUEST_URI} ^/api/update-check\.php$ [NC]
-RewriteRule ^(.*)$ https://admin.cyberchakra.in/api/compat/v1/update-check [P,L]
+RewriteRule ^(.*)$ https://cyberchakra.online/api/compat/v1/update-check [P,L]
 
 RewriteCond %{REQUEST_URI} ^/api/announcements\.php$ [NC]
-RewriteRule ^(.*)$ https://admin.cyberchakra.in/api/compat/v1/announcements [P,L]
+RewriteRule ^(.*)$ https://cyberchakra.online/api/compat/v1/announcements [P,L]
 
 RewriteCond %{REQUEST_URI} ^/api/health\.php$ [NC]
-RewriteRule ^(.*)$ https://admin.cyberchakra.in/api/compat/v1/health [P,L]
+RewriteRule ^(.*)$ https://cyberchakra.online/api/compat/v1/health [P,L]
 ```
 
 ### Phase 3: Update Desktop App to Use New Endpoints (Week 5-6)
@@ -308,7 +308,7 @@ This requires a desktop app update. Change `LicenseServerConfig::default()` to u
 impl Default for LicenseServerConfig {
     fn default() -> Self {
         Self {
-            base_url: "https://admin.cyberchakra.in/api/public/v1".to_string(),
+            base_url: "https://cyberchakra.online/api/public/v1".to_string(),
             api_key: None,
         }
     }
@@ -350,7 +350,7 @@ This allows older desktop app versions that haven't updated to continue working 
 - [ ] Zero errors in new portal logs related to license operations
 - [ ] All active desktop app users have validated at least once through new portal
 - [ ] PHP server access logs show zero direct hits (all proxied)
-- [ ] New desktop app version with direct admin.cyberchakra.in URLs released
+- [ ] New desktop app version with direct cyberchakra.online URLs released
 - [ ] At least 70% of active users on the new desktop app version
 
 **Steps:**
@@ -358,7 +358,7 @@ This allows older desktop app versions that haven't updated to continue working 
 2. Export final database snapshot from PHP as archive
 3. Keep PHP server running in read-only mode for 30 more days (matches offline grace period)
 4. After 30 days, take PHP server down
-5. Keep DNS record for `license.cyberchakra.in` pointing to a static page explaining the migration
+5. Keep DNS record for `cyberchakra.online` pointing to a static page explaining the migration
 
 ---
 
@@ -671,7 +671,7 @@ First, determine the PHP server's database structure. Connect to it and export:
 
 ```bash
 # SSH into the PHP server
-ssh user@license.cyberchakra.in
+ssh user@cyberchakra.online
 
 # If MySQL:
 mysqldump -u root -p license_db \
@@ -911,14 +911,14 @@ WHERE sl.expires_at IS NOT NULL AND sl.expires_at != l.expires_at;
 
 | Option | Description | Pros | Cons | Risk |
 |--------|------------|------|------|------|
-| **A: Same domain, versioned paths** | `license.cyberchakra.in/api/v2/...` | No CORS issues, single domain | Requires PHP server to handle routing, couples old and new | Medium |
-| **B: New subdomain** | `admin.cyberchakra.in/api/public/v1/...` | Clean separation, independent deployment, independent scaling | Requires desktop app update for direct access, CORS if mixing | Low |
-| **C: Same domain, rewrite .php** | `license.cyberchakra.in/api/activate.php` -> proxied | Zero desktop app changes needed | Proxy adds latency, single point of failure at proxy | Medium |
+| **A: Same domain, versioned paths** | `cyberchakra.online/api/v2/...` | No CORS issues, single domain | Requires PHP server to handle routing, couples old and new | Medium |
+| **B: New subdomain** | `cyberchakra.online/api/public/v1/...` | Clean separation, independent deployment, independent scaling | Requires desktop app update for direct access, CORS if mixing | Low |
+| **C: Same domain, rewrite .php** | `cyberchakra.online/api/activate.php` -> proxied | Zero desktop app changes needed | Proxy adds latency, single point of failure at proxy | Medium |
 
 ### RECOMMENDED: Option B + C Combined (Belt and Suspenders)
 
 **Phase 2-3:** Use Option C (proxy rewrites) so existing desktop apps work without updates.
-**Phase 3+:** Release desktop app update with Option B (direct to `admin.cyberchakra.in`).
+**Phase 3+:** Release desktop app update with Option B (direct to `cyberchakra.online`).
 **Phase 4:** Remove proxy once most users have updated.
 
 **This is safest because:**
@@ -932,13 +932,13 @@ WHERE sl.expires_at IS NOT NULL AND sl.expires_at != l.expires_at;
 
 ```
 # Current
-license.cyberchakra.in  A     <Hostinger PHP server IP>
+cyberchakra.online  A     <Hostinger PHP server IP>
 
 # Add (do NOT change existing)
-admin.cyberchakra.in    CNAME cname.vercel-dns.com
+cyberchakra.online    CNAME cname.vercel-dns.com
 
-# Phase 2: license.cyberchakra.in stays as-is (proxy on same server)
-# Phase 4: license.cyberchakra.in can be pointed to a redirect page
+# Phase 2: cyberchakra.online stays as-is (proxy on same server)
+# Phase 4: cyberchakra.online can be pointed to a redirect page
 ```
 
 ### CORS Configuration
@@ -972,11 +972,11 @@ export function middleware(request: NextRequest) {
 **Action:** Change nginx/LiteSpeed proxy target back to PHP:
 
 ```bash
-# On the license.cyberchakra.in server:
+# On the cyberchakra.online server:
 
 # Option A: Nginx - swap to PHP config
 sudo cp /etc/nginx/sites-available/license-php-only.conf \
-        /etc/nginx/sites-available/license.cyberchakra.in
+        /etc/nginx/sites-available/cyberchakra.online
 sudo nginx -t && sudo systemctl reload nginx
 
 # Option B: LiteSpeed - disable .htaccess rewrites
@@ -1068,12 +1068,12 @@ export async function GET() {
 | When | What Changes | Who Is Affected |
 |------|-------------|----------------|
 | Day 0 (Phase 2 start) | Proxy routes to new portal | All existing users, transparently |
-| Week 4 (Phase 3 start) | New app version released with direct `admin.cyberchakra.in` URLs | Only users who update |
+| Week 4 (Phase 3 start) | New app version released with direct `cyberchakra.online` URLs | Only users who update |
 | Week 8+ (Phase 4) | Proxy decommissioned | Users who haven't updated still work via offline grace |
 
 ### Can We Do It Without a Desktop App Update?
 
-**YES, for the critical path.** The proxy approach (Phase 2) requires zero desktop app changes. The desktop app will continue to call `license.cyberchakra.in/api/activate.php`, and the proxy silently routes to the new portal.
+**YES, for the critical path.** The proxy approach (Phase 2) requires zero desktop app changes. The desktop app will continue to call `cyberchakra.online/api/activate.php`, and the proxy silently routes to the new portal.
 
 **However, a desktop app update IS recommended for:**
 1. Removing dependency on the proxy server
@@ -1108,7 +1108,7 @@ impl Default for LicenseServerConfig {
     fn default() -> Self {
         Self {
             // NEW: Use admin portal directly
-            base_url: "https://admin.cyberchakra.in/api/public/v1".to_string(),
+            base_url: "https://cyberchakra.online/api/public/v1".to_string(),
             api_key: None,
         }
     }
@@ -1169,8 +1169,8 @@ Before cutting over, capture snapshots of every PHP endpoint response and verify
 
 set -euo pipefail
 
-PHP_BASE="https://license.cyberchakra.in/api"
-NEW_BASE="https://admin.cyberchakra.in/api/compat/v1"
+PHP_BASE="https://cyberchakra.online/api"
+NEW_BASE="https://cyberchakra.online/api/compat/v1"
 TEST_KEY="CCF-TEST-TEST-TEST-TEST"  # Use a dedicated test license
 TEST_FP="test_fingerprint_hash_for_migration"
 
@@ -1416,7 +1416,7 @@ export const options = {
   },
 };
 
-const BASE = 'https://admin.cyberchakra.in/api/compat/v1';
+const BASE = 'https://cyberchakra.online/api/compat/v1';
 
 export default function () {
   // Health check
@@ -1454,7 +1454,7 @@ k6 run k6-migration-test.js
 - [ ] Rust deserialization tests pass
 - [ ] Data migration verification queries return 0 mismatches
 - [ ] Load test passes with <500ms p95 and <1% error rate
-- [ ] Admin portal is accessible at `admin.cyberchakra.in`
+- [ ] Admin portal is accessible at `cyberchakra.online`
 - [ ] PHP server backup taken and stored
 - [ ] PHP database final export completed
 - [ ] Dual-write sync job tested
@@ -1471,13 +1471,13 @@ ssh license-server "cd /var/www && php artisan migrate:final-sync"
 # Step 2: Enable proxy (T=0)
 ssh license-server "
   sudo cp /etc/nginx/sites-available/license-proxy.conf \
-          /etc/nginx/sites-available/license.cyberchakra.in
+          /etc/nginx/sites-available/cyberchakra.online
   sudo nginx -t
   sudo systemctl reload nginx
 "
 
 # Step 3: Verify proxy is working (T+1 min)
-curl -s https://license.cyberchakra.in/api/health.php | jq .
+curl -s https://cyberchakra.online/api/health.php | jq .
 # Expected: {"status":"ok"} from new portal
 
 # Step 4: Monitor for 15 minutes (T+1 to T+15)
@@ -1506,7 +1506,7 @@ ssh license-server "tail -f /var/log/nginx/error.log"
 vercel logs --filter "status >= 500"
 
 # Terminal 4: Test activation manually
-curl -X POST https://license.cyberchakra.in/api/activate.php \
+curl -X POST https://cyberchakra.online/api/activate.php \
   -H "Content-Type: application/json" \
   -d '{"license_key":"CCF-TEST-TEST-TEST-TEST","hardware_fingerprint":"cutover_test","user_email":"test@cyberchakra.in","machine_name":"CUTOVER","os_info":"Test","app_version":"2.0.0"}'
 ```

@@ -14,6 +14,10 @@ import {
   Layers,
   Copy,
   Check,
+  Clock,
+  Infinity,
+  FlaskConical,
+  Building2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -73,6 +77,32 @@ const tierConfig: Record<
   government: { label: "Government", variant: "default", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800" },
 };
 
+const licenseTypeConfig: Record<
+  string,
+  { label: string; icon: typeof Clock; color: string }
+> = {
+  trial: { label: "Trial", icon: FlaskConical, color: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 border-orange-200 dark:border-orange-800" },
+  time_limited: { label: "Time-Limited", icon: Clock, color: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300 border-sky-200 dark:border-sky-800" },
+  perpetual: { label: "Perpetual", icon: Infinity, color: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 border-violet-200 dark:border-violet-800" },
+  organization: { label: "Organization", icon: Building2, color: "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300 border-teal-200 dark:border-teal-800" },
+};
+
+/** Compute expiry status from validUntil and license status */
+function getExpiryInfo(validUntil: string | null, status: string): { label: string; color: string } | null {
+  if (!validUntil) return null; // perpetual
+  if (status === "revoked" || status === "suspended") return null; // status takes precedence
+  const now = new Date();
+  const expiry = new Date(validUntil);
+  const daysUntilExpiry = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (daysUntilExpiry < 0) {
+    return { label: "Expired", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" };
+  }
+  if (daysUntilExpiry <= 30) {
+    return { label: `${daysUntilExpiry}d left`, color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" };
+  }
+  return { label: "Active", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" };
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -82,6 +112,7 @@ export function LicensesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [tierFilter, setTierFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -116,11 +147,12 @@ export function LicensesPage() {
     fetchLicenses({
       status: statusFilter !== "all" ? statusFilter : undefined,
       tier: tierFilter !== "all" ? tierFilter : undefined,
+      licenseType: typeFilter !== "all" ? typeFilter : undefined,
       search: debouncedSearch || undefined,
       page: currentPage,
       limit: perPage,
     });
-  }, [fetchLicenses, statusFilter, tierFilter, debouncedSearch, currentPage, perPage]);
+  }, [fetchLicenses, statusFilter, tierFilter, typeFilter, debouncedSearch, currentPage, perPage]);
 
   useEffect(() => {
     loadLicenses();
@@ -206,6 +238,24 @@ export function LicensesPage() {
                 <SelectItem value="government">Government</SelectItem>
               </SelectContent>
             </Select>
+            <Select
+              value={typeFilter}
+              onValueChange={(v) => {
+                setTypeFilter(v);
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="trial">Trial</SelectItem>
+                <SelectItem value="time_limited">Time-Limited</SelectItem>
+                <SelectItem value="perpetual">Perpetual</SelectItem>
+                <SelectItem value="organization">Organization</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -218,6 +268,7 @@ export function LicensesPage() {
               <TableRow>
                 <TableHead>License Key</TableHead>
                 <TableHead>Organization</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Tier</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Activations</TableHead>
@@ -235,6 +286,9 @@ export function LicensesPage() {
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-4 w-40" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-5 w-24 rounded-md" />
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-5 w-20 rounded-md" />
@@ -257,7 +311,7 @@ export function LicensesPage() {
               {/* Empty state */}
               {!isLoading && licenses.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7}>
+                  <TableCell colSpan={8}>
                     <div className="flex flex-col items-center justify-center py-16 text-center">
                       <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--muted))]">
                         <FileX2 className="h-7 w-7 text-[hsl(var(--muted-foreground))]" />
@@ -266,11 +320,11 @@ export function LicensesPage() {
                         No licenses found
                       </h3>
                       <p className="mt-1 max-w-sm text-xs text-[hsl(var(--muted-foreground))]">
-                        {search || statusFilter !== "all" || tierFilter !== "all"
-                          ? "Try adjusting your filters or search query."
-                          : "Get started by creating your first license."}
+                        {search || statusFilter !== "all" || tierFilter !== "all" || typeFilter !== "all"
+                          ? "No licenses match your current filters. Try broadening your search or clearing filters."
+                          : "No licenses have been issued yet. Create your first license to start managing activations and entitlements."}
                       </p>
-                      {!search && statusFilter === "all" && tierFilter === "all" && (
+                      {!search && statusFilter === "all" && tierFilter === "all" && typeFilter === "all" && (
                         <Button
                           size="sm"
                           className="mt-4"
@@ -300,6 +354,13 @@ export function LicensesPage() {
                     variant: "outline" as const,
                     color: "bg-gray-100 text-gray-600 dark:bg-gray-800/60 dark:text-gray-400 border-gray-200 dark:border-gray-700",
                   };
+                  const licType = licenseTypeConfig[lic.licenseType] || {
+                    label: lic.licenseType?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Unknown",
+                    icon: Clock,
+                    color: "bg-gray-100 text-gray-600 dark:bg-gray-800/60 dark:text-gray-400 border-gray-200 dark:border-gray-700",
+                  };
+                  const TypeIcon = licType.icon;
+                  const expiryInfo = getExpiryInfo(lic.validUntil, lic.status);
                   const activationPct = lic.maxActivations > 0
                     ? Math.min((lic.currentActivations / lic.maxActivations) * 100, 100)
                     : 0;
@@ -338,6 +399,12 @@ export function LicensesPage() {
                         {lic.organization?.name || (
                           <span className="text-[hsl(var(--muted-foreground))] italic">Unassigned</span>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${licType.color}`}>
+                          <TypeIcon className="h-3 w-3" />
+                          {licType.label}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${tier.color}`}>
@@ -379,16 +446,23 @@ export function LicensesPage() {
                       </TableCell>
                       <TableCell className="text-sm">
                         {lic.validUntil ? (
-                          <span className="text-[hsl(var(--muted-foreground))]">
-                            {new Date(lic.validUntil).toLocaleDateString(
-                              "en-IN",
-                              {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              },
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[hsl(var(--muted-foreground))]">
+                              {new Date(lic.validUntil).toLocaleDateString(
+                                "en-IN",
+                                {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                },
+                              )}
+                            </span>
+                            {expiryInfo && (
+                              <span className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${expiryInfo.color}`}>
+                                {expiryInfo.label}
+                              </span>
                             )}
-                          </span>
+                          </div>
                         ) : (
                           <span className="italic text-[hsl(var(--muted-foreground)/0.6)]">
                             Perpetual
@@ -419,14 +493,19 @@ export function LicensesPage() {
                             </DropdownMenuItem>
                             {lic.status === "active" && canSuspend && (
                               <DropdownMenuItem
-                                onClick={(e) => {
+                                onClick={async (e) => {
                                   e.stopPropagation();
                                   if (
                                     window.confirm(
                                       `Suspend license ${lic.licenseKey}?`,
                                     )
                                   ) {
-                                    suspendLicense(lic.id);
+                                    try {
+                                      await suspendLicense(lic.id);
+                                      toast.success("License suspended successfully");
+                                    } catch (err) {
+                                      toast.error(err instanceof Error ? err.message : "Failed to suspend license");
+                                    }
                                   }
                                 }}
                               >
@@ -445,14 +524,19 @@ export function LicensesPage() {
                             </DropdownMenuItem>
                             {lic.status !== "revoked" && canRevoke && (
                               <DropdownMenuItem
-                                onClick={(e) => {
+                                onClick={async (e) => {
                                   e.stopPropagation();
                                   if (
                                     window.confirm(
                                       `Revoke license ${lic.licenseKey}? This will deactivate all machines.`,
                                     )
                                   ) {
-                                    revokeLicense(lic.id);
+                                    try {
+                                      await revokeLicense(lic.id);
+                                      toast.success("License revoked successfully");
+                                    } catch (err) {
+                                      toast.error(err instanceof Error ? err.message : "Failed to revoke license");
+                                    }
                                   }
                                 }}
                                 className="text-[hsl(var(--destructive))] focus:text-[hsl(var(--destructive))]"

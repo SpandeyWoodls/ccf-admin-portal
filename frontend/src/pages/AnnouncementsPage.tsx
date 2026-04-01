@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Plus,
   Search,
@@ -15,6 +15,10 @@ import {
   CheckCircle,
   PauseCircle,
   XCircle,
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
+  CalendarClock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +42,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAnnouncementStore } from "@/stores/announcementStore";
+import { useAnnouncementStore, useAnnouncementPagination, type Announcement } from "@/stores/announcementStore";
 import { RoleGuard } from "@/components/shared/RoleGuard";
 
 // ---------------------------------------------------------------------------
@@ -47,23 +51,6 @@ import { RoleGuard } from "@/components/shared/RoleGuard";
 
 type AnnouncementType = "info" | "warning" | "critical" | "maintenance";
 type TierValue = "individual" | "team" | "enterprise" | "government";
-
-interface Announcement {
-  id: string;
-  title: string;
-  message: string;
-  announcementType: AnnouncementType;
-  priority: number;
-  actionUrl: string | null;
-  actionLabel: string | null;
-  dismissible: boolean;
-  startsAt: string;
-  expiresAt: string | null;
-  isActive: boolean;
-  targetTiers: TierValue[] | null;
-  targetOrgIds: string[] | null;
-  createdAt: string;
-}
 
 interface AnnouncementFormData {
   title: string;
@@ -219,7 +206,7 @@ function announcementToForm(a: Announcement): AnnouncementFormData {
     dismissible: a.dismissible,
     startsAt: toInputDate(a.startsAt),
     expiresAt: a.expiresAt ? toInputDate(a.expiresAt) : "",
-    targetTiers: a.targetTiers ?? [],
+    targetTiers: (a.targetTiers as TierValue[] | null) ?? [],
     allTiers: a.targetTiers === null,
   };
 }
@@ -286,10 +273,12 @@ function AnnouncementCard({
   announcement,
   onEdit,
   onToggleActive,
+  onDelete,
 }: {
   announcement: Announcement;
   onEdit: () => void;
   onToggleActive: () => void;
+  onDelete: () => void;
 }) {
   const typeConf = TYPE_CONFIG[announcement.announcementType];
   const TypeIcon = typeConf.icon;
@@ -299,7 +288,7 @@ function AnnouncementCard({
   const targeting =
     announcement.targetTiers === null
       ? "All users"
-      : announcement.targetTiers.map((t) => TIER_LABELS[t]).join(", ");
+      : announcement.targetTiers.map((t) => TIER_LABELS[t as TierValue] ?? t).join(", ");
 
   return (
     <Card
@@ -374,6 +363,16 @@ function AnnouncementCard({
 
         {/* Row 4: metadata */}
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[hsl(var(--muted-foreground))]">
+          <span className="inline-flex items-center gap-1">
+            <CalendarClock className="h-3 w-3" />
+            Starts: {formatDateTime(announcement.startsAt)}
+          </span>
+          {announcement.expiresAt && (
+            <span className="inline-flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Expires: {formatDateTime(announcement.expiresAt)}
+            </span>
+          )}
           <span>
             Targeting:{" "}
             <span className="font-medium text-[hsl(var(--foreground))]">
@@ -386,12 +385,6 @@ function AnnouncementCard({
               {announcement.dismissible ? "Yes" : "No"}
             </span>
           </span>
-          {announcement.expiresAt && (
-            <span className="inline-flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              Expires: {formatDateTime(announcement.expiresAt)}
-            </span>
-          )}
         </div>
 
         {/* Row 5: actions */}
@@ -422,6 +415,15 @@ function AnnouncementCard({
                   Activate
                 </>
               )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDelete}
+              className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))]"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete
             </Button>
           </div>
           {/* Active/Inactive toggle indicator */}
@@ -454,16 +456,20 @@ function AnnouncementCard({
 
 export function AnnouncementsPage() {
   const {
-    announcements: storeAnnouncements,
+    announcements,
     isLoading,
     fetchAnnouncements,
     createAnnouncement,
     updateAnnouncement,
+    deleteAnnouncement,
   } = useAnnouncementStore();
+  const pagination = useAnnouncementPagination();
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const perPage = 20;
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -471,32 +477,20 @@ export function AnnouncementsPage() {
   const [form, setForm] = useState<AnnouncementFormData>(emptyFormData);
   const [errors, setErrors] = useState<FormErrors>({});
 
-  // Fetch announcements on mount
-  useEffect(() => {
-    fetchAnnouncements();
-  }, [fetchAnnouncements]);
+  // Delete confirmation state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingAnnouncement, setDeletingAnnouncement] = useState<Announcement | null>(null);
 
-  // Map store announcements to page-local shape
-  const announcements: Announcement[] = useMemo(
-    () =>
-      storeAnnouncements.map((a) => ({
-        id: a.id,
-        title: a.title,
-        message: a.body,
-        announcementType: (a.severity as AnnouncementType) || "info",
-        priority: 5,
-        actionUrl: null,
-        actionLabel: null,
-        dismissible: true,
-        startsAt: a.publishAt || a.createdAt,
-        expiresAt: a.expiresAt,
-        isActive: a.isActive,
-        targetTiers: null,
-        targetOrgIds: null,
-        createdAt: a.createdAt,
-      })),
-    [storeAnnouncements],
-  );
+  const totalPages = pagination.totalPages || Math.ceil(pagination.total / perPage) || 1;
+
+  // Fetch announcements when page changes
+  const loadAnnouncements = useCallback(() => {
+    fetchAnnouncements({ page: currentPage, limit: perPage });
+  }, [fetchAnnouncements, currentPage, perPage]);
+
+  useEffect(() => {
+    loadAnnouncements();
+  }, [loadAnnouncements]);
 
   // ------- Filtering -------
   const filtered = useMemo(() => {
@@ -541,6 +535,22 @@ export function AnnouncementsPage() {
     if (!target) return;
     try {
       await updateAnnouncement(id, { isActive: !target.isActive });
+    } catch {
+      // Error handled in store
+    }
+  }
+
+  function openDelete(a: Announcement) {
+    setDeletingAnnouncement(a);
+    setDeleteDialogOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!deletingAnnouncement) return;
+    try {
+      await deleteAnnouncement(deletingAnnouncement.id);
+      setDeleteDialogOpen(false);
+      setDeletingAnnouncement(null);
     } catch {
       // Error handled in store
     }
@@ -829,8 +839,46 @@ export function AnnouncementsPage() {
               announcement={a}
               onEdit={() => openEdit(a)}
               onToggleActive={() => toggleActive(a.id)}
+              onDelete={() => openDelete(a)}
             />
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!isLoading && pagination.total > 0 && (
+        <div className="flex items-center justify-between rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-4 py-2.5">
+          <p className="text-xs text-[hsl(var(--muted-foreground))]">
+            <span className="font-medium text-[hsl(var(--foreground))]">
+              {(currentPage - 1) * perPage + 1}-{Math.min(currentPage * perPage, pagination.total)}
+            </span>
+            {" "}of {pagination.total} announcements
+          </p>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[hsl(var(--muted-foreground))]">
+              Page {currentPage} of {totalPages}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => p - 1)}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => p + 1)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1097,6 +1145,40 @@ export function AnnouncementsPage() {
             </Button>
             <Button onClick={handleSubmit}>
               {editingId ? "Save Changes" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Announcement</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-[hsl(var(--foreground))]">
+                {deletingAnnouncement?.title}
+              </span>
+              ? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setDeletingAnnouncement(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

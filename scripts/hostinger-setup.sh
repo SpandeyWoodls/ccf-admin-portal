@@ -17,6 +17,7 @@
 
 set -euo pipefail
 
+ADMIN_EMAIL="${ADMIN_EMAIL:-admin@cyberchakra.in}"
 BACKEND_DIR="$HOME/backend"
 
 echo "============================================"
@@ -76,17 +77,17 @@ const prisma = new PrismaClient();
 async function seed() {
   const hash = await bcrypt.hash('ChangeMe123!', 12);
   await prisma.adminUser.upsert({
-    where: { email: 'admin@cyberchakra.in' },
+    where: { email: '$ADMIN_EMAIL' },
     update: {},
     create: {
-      email: 'admin@cyberchakra.in',
+      email: '$ADMIN_EMAIL',
       name: 'Admin',
       passwordHash: hash,
       role: 'super_admin',
       isActive: true,
     }
   });
-  console.log('  Default admin created: admin@cyberchakra.in / ChangeMe123!');
+  console.log('  Default admin created: $ADMIN_EMAIL / ChangeMe123!');
   await prisma.\$disconnect();
 }
 seed().catch(e => { console.error('Seed failed:', e); process.exit(1); });
@@ -104,7 +105,7 @@ echo "  3. Set Node.js version: 20"
 echo "  4. Click 'Restart'"
 echo ""
 echo "IMPORTANT: Change the default admin password immediately!"
-echo "  Login at: https://admin.cyberchakra.in"
-echo "  Email:    admin@cyberchakra.in"
+echo "  Login at: https://cyberchakra.online"
+echo "  Email:    $ADMIN_EMAIL"
 echo "  Password: ChangeMe123!"
 echo ""

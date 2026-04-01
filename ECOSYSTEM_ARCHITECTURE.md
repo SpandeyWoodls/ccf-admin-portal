@@ -153,7 +153,7 @@ The control plane. Where CCF admins manage licenses, customers, releases, and an
 | **Backend** | Node.js 20, Express, TypeScript, Prisma ORM |
 | **Database** | MySQL 8.x |
 | **Auth** | JWT (access + refresh tokens), bcrypt password hashing |
-| **Hosting** | Hostinger VPS at `admin.cyberchakra.in` |
+| **Hosting** | Hostinger VPS at `cyberchakra.online` |
 | **Process Manager** | PM2 or Hostinger Node.js manager |
 
 Directory structure:
@@ -610,7 +610,7 @@ These endpoints are called by the Rust desktop app via `reqwest`. They do NOT re
 
 ### 6.2 Legacy PHP Compatibility
 
-The desktop app v1.x called `.php` endpoints on the old `license.cyberchakra.in` server. The admin portal provides transparent URL rewriting so old app versions continue working without an update:
+The desktop app v1.x called `.php` endpoints on the old `cyberchakra.online` server. The admin portal provides transparent URL rewriting so old app versions continue working without an update:
 
 | Old Path | New Path |
 |----------|----------|
@@ -793,7 +793,7 @@ Developer tags a release (e.g., v2.1.0)
 ### 9.1 Production Layout on Hostinger
 
 ```
-Hostinger VPS (admin.cyberchakra.in)
+Hostinger VPS (cyberchakra.online)
 |
 |-- Let's Encrypt SSL (auto-renewed)
 |-- LiteSpeed Web Server
@@ -832,7 +832,7 @@ Hostinger VPS (admin.cyberchakra.in)
 Internet
    |
    v
-admin.cyberchakra.in (DNS -> Hostinger IP)
+cyberchakra.online (DNS -> Hostinger IP)
    |
    v
 LiteSpeed (port 443, SSL terminated)
@@ -1114,7 +1114,7 @@ npm run tauri build
 2. Go to **GitHub Actions > Deploy to Hostinger > Run workflow**.
 3. Select environment (`production` or `staging`).
 4. Wait for the workflow to complete (~3-5 minutes).
-5. Verify: `curl https://admin.cyberchakra.in/api/v1/health`
+5. Verify: `curl https://cyberchakra.online/api/v1/health`
 
 ### How to Release a New Desktop App Version
 
@@ -1172,10 +1172,10 @@ Desktop App ---- GET /update-check ----> Admin Portal
 | `JWT_SECRET` | `change-this-...` | 64-char random hex |
 | `CCF_HMAC_SECRET` | `must-match-desktop-app` | Production shared secret |
 | `PORT` | `3001` | `3001` |
-| `CORS_ORIGIN` | `http://localhost:5173` | `https://admin.cyberchakra.in` |
+| `CORS_ORIGIN` | `http://localhost:5173` | `https://cyberchakra.online` |
 | `NODE_ENV` | `development` | `production` |
-| `VITE_API_URL` | `http://localhost:3001` | `https://admin.cyberchakra.in` |
-| Update endpoint (Tauri) | N/A | `https://license.cyberchakra.in/api/update-check.php?...` |
+| `VITE_API_URL` | `http://localhost:3001` | `https://cyberchakra.online` |
+| Update endpoint (Tauri) | N/A | `https://cyberchakra.online/api/update-check.php?...` |
 
 ## Appendix C: Related Documentation
 

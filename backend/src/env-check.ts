@@ -73,6 +73,8 @@ const checks: EnvCheck[] = [
         return "JWT_REFRESH_SECRET must differ from JWT_SECRET";
       if (process.env.NODE_ENV === "production" && v.length < 64)
         return "Production JWT_REFRESH_SECRET must be at least 64 characters";
+      if (process.env.NODE_ENV === "production" && (v.includes("dev") || v.includes("change") || v.includes("not-for")))
+        return "Production JWT_REFRESH_SECRET appears to be a placeholder value";
       return null;
     },
   },
@@ -128,6 +130,8 @@ const checks: EnvCheck[] = [
     required: true,
     validate: (v) => {
       if (process.env.NODE_ENV === "production") {
+        if (v === "*")
+          return "Production CORS_ORIGIN cannot be wildcard '*'";
         if (v.includes("localhost"))
           return "Production CORS_ORIGIN must not include localhost";
         const origins = v.split(",").map((s) => s.trim());
@@ -166,6 +170,17 @@ const checks: EnvCheck[] = [
         !v.startsWith("https://")
       )
         return "Production PORTAL_URL must use HTTPS";
+      return null;
+    },
+  },
+  {
+    name: "EMAIL_TRANSPORT",
+    value: process.env.USE_SENDMAIL || process.env.SMTP_USER || undefined,
+    required: false,
+    validate: () => {
+      if (!process.env.USE_SENDMAIL && !process.env.SMTP_USER) {
+        return "Neither USE_SENDMAIL nor SMTP_USER is set - no email transport configured";
+      }
       return null;
     },
   },

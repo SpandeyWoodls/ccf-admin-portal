@@ -32,7 +32,7 @@ jobs:
     environment: production
     defaults:
       run:
-        working-directory: docs/admin-portal
+        working-directory: .
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -55,10 +55,10 @@ jobs:
 
       - name: Build frontend (production)
         env:
-          VITE_API_URL: "https://admin.cyberchakra.in"
+          VITE_API_URL: "https://cyberchakra.online"
         run: |
           cd frontend
-          echo "VITE_API_URL=\"https://admin.cyberchakra.in\"" > .env
+          echo "VITE_API_URL=\"https://cyberchakra.online\"" > .env
           npm run build
 
       - name: Build backend
@@ -97,7 +97,7 @@ jobs:
 
             # Backup current frontend
             tar -czf ~/backups/app/public_html_${TIMESTAMP}.tar.gz \
-              -C ~/domains/admin.cyberchakra.in/public_html . 2>/dev/null || echo "No existing public_html to backup"
+              -C ~/domains/cyberchakra.online/public_html . 2>/dev/null || echo "No existing public_html to backup"
 
             # Backup current backend dist
             tar -czf ~/backups/app/backend_dist_${TIMESTAMP}.tar.gz \
@@ -115,7 +115,7 @@ jobs:
           host: ${{ secrets.HOSTINGER_HOST }}
           username: ${{ secrets.HOSTINGER_USER }}
           key: ${{ secrets.HOSTINGER_SSH_KEY }}
-          source: "docs/admin-portal/deploy/*"
+          source: "./deploy/*"
           target: "/home/${{ secrets.HOSTINGER_USER }}/deploy_staging"
           strip_components: 4
 
@@ -128,8 +128,8 @@ jobs:
           script: |
             set -e
 
-            ADMIN_PUBLIC="$HOME/domains/admin.cyberchakra.in/public_html"
-            LICENSE_PUBLIC="$HOME/domains/license.cyberchakra.in/public_html"
+            ADMIN_PUBLIC="$HOME/domains/cyberchakra.online/public_html"
+            LICENSE_PUBLIC="$HOME/domains/cyberchakra.online/public_html"
             BACKEND="$HOME/admin-portal/backend"
 
             # Deploy frontend (atomic via rsync)
@@ -167,7 +167,7 @@ jobs:
             sleep 5
 
             # Health check
-            HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 https://admin.cyberchakra.in/api/v1/health 2>/dev/null || echo "000")
+            HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 https://cyberchakra.online/api/v1/health 2>/dev/null || echo "000")
             if [ "$HTTP_CODE" = "200" ]; then
               echo "Health check PASSED (HTTP 200)"
             else

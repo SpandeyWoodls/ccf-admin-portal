@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet, apiPost, apiPatch } from "@/lib/api";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -7,11 +7,11 @@ import { apiGet, apiPost } from "@/lib/api";
 
 export interface TicketMessage {
   id: string;
-  message: string;       // Primary field (from backend)
-  body?: string;         // Legacy alias
+  message: string;
+  body?: string; // Legacy alias
   isInternal: boolean;
-  senderName: string;    // Primary field (from backend)
-  sender?: string;       // Legacy alias
+  senderName: string;
+  sender?: string; // Legacy alias
   senderType: string;
   createdAt: string;
 }
@@ -23,46 +23,43 @@ export interface Ticket {
   status: string;
   priority: string;
   category: string;
-  requesterEmail: string;
-  requesterName: string;
-  organization?: { id: string; name: string };
-  license?: { id: string; licenseKey: string };
-  assignedTo?: { id: string; name: string };
+  licenseKey: string;
+  organizationId?: string | null;
+  assignedToId?: string | null;
+  organization?: { id: string; name: string; slug?: string } | null;
+  messageCount?: number;
+  lastMessageAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  closedAt?: string | null;
 }
 
 export interface TicketDetail extends Ticket {
-  description: string;
   messages: TicketMessage[];
 }
 
 export interface TicketFilters {
   status?: string;
   priority?: string;
+  category?: string;
   search?: string;
   page?: number;
   limit?: number;
 }
 
-// ---------------------------------------------------------------------------
-// NOTE: The backend does NOT yet have admin support ticket routes.
-// The public routes exist at /api/v1/support/ for the desktop app:
-//   POST /api/v1/support/create-ticket
-//   POST /api/v1/support/ticket-status
-//   POST /api/v1/support/ticket-details
-//   POST /api/v1/support/reply-ticket
-//
-// Missing backend routes that need to be created:
-//   GET  /api/v1/admin/tickets              (list all tickets for admin)
-//   GET  /api/v1/admin/tickets/:id          (ticket detail with all messages)
-//   POST /api/v1/admin/tickets/:id/reply    (admin reply, supports isInternal)
-//   POST /api/v1/admin/tickets/:id/close    (close a ticket)
-//
-// Until those are implemented, this store returns empty arrays on API failure.
-// ---------------------------------------------------------------------------
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
 
-// No mock data -- stores return empty arrays on API failure
+const DEFAULT_PAGINATION: Pagination = {
+  page: 1,
+  limit: 20,
+  total: 0,
+  totalPages: 0,
+};
 
 // ---------------------------------------------------------------------------
 // Store
@@ -70,8 +67,10 @@ export interface TicketFilters {
 
 interface SupportState {
   tickets: Ticket[];
+  pagination: Pagination;
   selectedTicket: TicketDetail | null;
   isLoading: boolean;
+  isDetailLoading: boolean;
   error: string | null;
 
   fetchTickets: (filters?: TicketFilters) => Promise<void>;
@@ -82,22 +81,31 @@ interface SupportState {
     isInternal: boolean,
   ) => Promise<void>;
   closeTicket: (id: string) => Promise<void>;
+  updateTicket: (
+    id: string,
+    data: { status?: string; priority?: string; category?: string },
+  ) => Promise<void>;
+  assignTicket: (id: string, adminId: string) => Promise<void>;
   clearSelectedTicket: () => void;
   reset: () => void;
 }
 
 export const useSupportStore = create<SupportState>()((set, get) => ({
   tickets: [],
+  pagination: { ...DEFAULT_PAGINATION },
   selectedTicket: null,
   isLoading: false,
+  isDetailLoading: false,
   error: null,
 
   fetchTickets: async (filters?: TicketFilters) => {
     set({ isLoading: true, error: null });
     try {
       const params = new URLSearchParams();
-      if (filters?.status) params.set("status", filters.status);
+      if (filters?.status && filters.status !== "all")
+        params.set("status", filters.status);
       if (filters?.priority) params.set("priority", filters.priority);
+      if (filters?.category) params.set("category", filters.category);
       if (filters?.search) params.set("search", filters.search);
       if (filters?.page) params.set("page", String(filters.page));
       if (filters?.limit) params.set("pageSize", String(filters.limit));
@@ -105,12 +113,27 @@ export const useSupportStore = create<SupportState>()((set, get) => ({
       const query = params.toString();
       const path = `/api/v1/admin/tickets${query ? `?${query}` : ""}`;
       const raw = await apiGet<any>(path);
-      // Backend may return { items: [...], total, page } or a raw array
-      const tickets = Array.isArray(raw) ? raw : Array.isArray(raw?.items) ? raw.items : Array.isArray(raw?.tickets) ? raw.tickets : [];
-      set({ tickets, isLoading: false });
+
+      // Backend returns { items: [...], total, page, pageSize, totalPages }
+      const tickets = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.items)
+          ? raw.items
+          : [];
+      const paginationData =
+        raw && !Array.isArray(raw) && raw.total !== undefined
+          ? {
+              page: raw.page ?? 1,
+              limit: raw.pageSize ?? 20,
+              total: raw.total,
+              totalPages: raw.totalPages ?? 1,
+            }
+          : { ...DEFAULT_PAGINATION, total: tickets.length };
+      set({ tickets, pagination: paginationData, isLoading: false });
     } catch (err) {
       set({
         tickets: [],
+        pagination: { ...DEFAULT_PAGINATION },
         isLoading: false,
         error:
           err instanceof Error ? err.message : "Failed to fetch tickets",
@@ -119,11 +142,9 @@ export const useSupportStore = create<SupportState>()((set, get) => ({
   },
 
   fetchTicket: async (id: string) => {
-    set({ isLoading: true, error: null });
+    set({ isDetailLoading: true, error: null });
     try {
-      const raw = await apiGet<any>(
-        `/api/v1/admin/tickets/${id}`,
-      );
+      const raw = await apiGet<any>(`/api/v1/admin/tickets/${id}`);
       // Ensure messages is always an array and normalize fields
       const detail: TicketDetail = {
         ...raw,
@@ -133,11 +154,11 @@ export const useSupportStore = create<SupportState>()((set, get) => ({
           senderName: m.senderName || m.sender || "User",
         })),
       };
-      set({ selectedTicket: detail, isLoading: false });
+      set({ selectedTicket: detail, isDetailLoading: false });
     } catch (err) {
       set({
         selectedTicket: null,
-        isLoading: false,
+        isDetailLoading: false,
         error:
           err instanceof Error
             ? err.message
@@ -151,7 +172,8 @@ export const useSupportStore = create<SupportState>()((set, get) => ({
     message: string,
     isInternal: boolean,
   ) => {
-    set({ isLoading: true, error: null });
+    // Don't set global isLoading -- use isSending in the component instead
+    set({ error: null });
     try {
       const reply = await apiPost<TicketMessage>(
         `/api/v1/admin/tickets/${id}/reply`,
@@ -164,38 +186,44 @@ export const useSupportStore = create<SupportState>()((set, get) => ({
           return {
             selectedTicket: {
               ...sel,
-              messages: [...sel.messages, reply],
+              messages: [
+                ...sel.messages,
+                {
+                  ...reply,
+                  message: reply.message || message,
+                  senderName: reply.senderName || "Support",
+                },
+              ],
+              // If status was "open" and not internal, backend moves to "in_progress"
+              status:
+                sel.status === "open" && !isInternal
+                  ? "in_progress"
+                  : sel.status,
             },
-            isLoading: false,
           };
         }
-        return { isLoading: false };
+        return {};
       });
     } catch (err) {
       console.error("Failed to send reply:", err);
       set({
-        isLoading: false,
         error:
-          err instanceof Error
-            ? err.message
-            : "Failed to send reply",
+          err instanceof Error ? err.message : "Failed to send reply",
       });
+      throw err;
     }
   },
 
   closeTicket: async (id: string) => {
-    set({ isLoading: true, error: null });
+    set({ error: null });
     try {
-      await apiPost<void>(
-        `/api/v1/admin/tickets/${id}/close`,
-      );
+      await apiPost<void>(`/api/v1/admin/tickets/${id}/close`);
     } catch (err) {
       console.error("Failed to close ticket:", err);
       set({
-        isLoading: false,
         error: err instanceof Error ? err.message : "Failed to close ticket",
       });
-      return;
+      throw err;
     }
     const { selectedTicket } = get();
     if (selectedTicket?.id === id) {
@@ -207,8 +235,68 @@ export const useSupportStore = create<SupportState>()((set, get) => ({
       tickets: state.tickets.map((t) =>
         t.id === id ? { ...t, status: "closed" } : t,
       ),
-      isLoading: false,
     }));
+  },
+
+  updateTicket: async (
+    id: string,
+    data: { status?: string; priority?: string; category?: string },
+  ) => {
+    set({ error: null });
+    try {
+      const updated = await apiPatch<Ticket>(
+        `/api/v1/admin/tickets/${id}`,
+        data,
+      );
+      // Update in list
+      set((state) => ({
+        tickets: state.tickets.map((t) =>
+          t.id === id ? { ...t, ...updated } : t,
+        ),
+      }));
+      // Update selected ticket if it matches
+      const { selectedTicket } = get();
+      if (selectedTicket?.id === id) {
+        set({
+          selectedTicket: { ...selectedTicket, ...updated },
+        });
+      }
+    } catch (err) {
+      console.error("Failed to update ticket:", err);
+      set({
+        error:
+          err instanceof Error ? err.message : "Failed to update ticket",
+      });
+      throw err;
+    }
+  },
+
+  assignTicket: async (id: string, adminId: string) => {
+    set({ error: null });
+    try {
+      const updated = await apiPost<Ticket>(
+        `/api/v1/admin/tickets/${id}/assign`,
+        { adminId },
+      );
+      set((state) => ({
+        tickets: state.tickets.map((t) =>
+          t.id === id ? { ...t, ...updated } : t,
+        ),
+      }));
+      const { selectedTicket } = get();
+      if (selectedTicket?.id === id) {
+        set({
+          selectedTicket: { ...selectedTicket, ...updated },
+        });
+      }
+    } catch (err) {
+      console.error("Failed to assign ticket:", err);
+      set({
+        error:
+          err instanceof Error ? err.message : "Failed to assign ticket",
+      });
+      throw err;
+    }
   },
 
   clearSelectedTicket: () => set({ selectedTicket: null }),
@@ -216,8 +304,10 @@ export const useSupportStore = create<SupportState>()((set, get) => ({
   reset: () =>
     set({
       tickets: [],
+      pagination: { ...DEFAULT_PAGINATION },
       selectedTicket: null,
       isLoading: false,
+      isDetailLoading: false,
       error: null,
     }),
 }));
@@ -233,3 +323,6 @@ export const useSelectedTicket = () =>
 
 export const useSupportLoading = () =>
   useSupportStore((s) => s.isLoading);
+
+export const useSupportPagination = () =>
+  useSupportStore((s) => s.pagination);

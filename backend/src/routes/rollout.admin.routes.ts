@@ -416,6 +416,7 @@ router.get(
       const blockedVersions = await prisma.blockedVersion.findMany({
         where,
         orderBy: { createdAt: "desc" },
+        take: 200,
       });
 
       res.json({

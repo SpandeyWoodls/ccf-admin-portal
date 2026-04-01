@@ -20,6 +20,7 @@ const AnnouncementsPage = lazy(() => import("./pages/AnnouncementsPage").then(m 
 const SupportPage = lazy(() => import("./pages/SupportPage").then(m => ({ default: m.SupportPage })));
 const TrialsPage = lazy(() => import("./pages/TrialsPage").then(m => ({ default: m.TrialsPage })));
 const AuditPage = lazy(() => import("./pages/AuditPage").then(m => ({ default: m.AuditPage })));
+const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage").then(m => ({ default: m.AdminUsersPage })));
 const DownloadsPage = lazy(() => import("./pages/DownloadsPage").then(m => ({ default: m.DownloadsPage })));
 const SettingsPage = lazy(() => import("./pages/SettingsPage").then(m => ({ default: m.SettingsPage })));
 
@@ -60,6 +61,11 @@ function App() {
           <Route path="/audit" element={
             <RoleGuard permission="audit.view" fallback={<AccessDenied />}>
               <AuditPage />
+            </RoleGuard>
+          } />
+          <Route path="/users" element={
+            <RoleGuard permission="settings.team" fallback={<AccessDenied />}>
+              <AdminUsersPage />
             </RoleGuard>
           } />
           <Route path="/settings" element={

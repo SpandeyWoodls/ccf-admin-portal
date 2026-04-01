@@ -18,6 +18,11 @@ import {
   BookOpen,
   ExternalLink,
   Info,
+  Trash2,
+  Smartphone,
+  Copy,
+  ShieldCheck,
+  ShieldOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,11 +35,20 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useAuthStore } from "@/stores/authStore";
-import { apiGet } from "@/lib/api";
+import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/api";
+import { toast } from "sonner";
 import { RoleGuard } from "@/components/shared/RoleGuard";
 
 // ---------------------------------------------------------------------------
@@ -97,20 +111,46 @@ function ProfileTab() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const handleUpdateProfile = () => {
-    if (newPassword && newPassword !== confirmPassword) {
-      console.log("[Settings] Passwords do not match");
-      return;
-    }
     setSaving(true);
     setTimeout(() => {
-      console.log("[Settings] Profile updated", { name, currentPassword: "***", newPassword: "***" });
+      console.log("[Settings] Profile updated", { name });
       setSaving(false);
+    }, 600);
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast.error("Please fill in all password fields.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast.error("New password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match.");
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await apiPatch("/api/v1/auth/change-password", { currentPassword, newPassword });
+      toast.success("Password changed successfully. Please log in again.");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    }, 600);
+      setTimeout(() => {
+        localStorage.clear();
+        window.location.href = "/login";
+      }, 1500);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to change password.";
+      toast.error(message);
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   return (
@@ -274,14 +314,14 @@ function ProfileTab() {
 
           <div className="flex justify-end pt-2">
             <Button
-              onClick={handleUpdateProfile}
-              disabled={saving}
+              onClick={handleChangePassword}
+              disabled={changingPassword}
               className="bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(230_65%_55%)] text-white shadow-md hover:shadow-lg hover:brightness-110 transition-all duration-200"
             >
-              {saving ? (
+              {changingPassword ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Saving...
+                  Changing...
                 </>
               ) : (
                 <>
@@ -298,6 +338,657 @@ function ProfileTab() {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: parse userAgent into short browser string
+// ---------------------------------------------------------------------------
+
+function parseBrowser(ua: string | null): string {
+  if (!ua) return "Unknown";
+  if (ua.includes("Edg/")) {
+    const os = ua.includes("Windows") ? "Windows" : ua.includes("Mac") ? "macOS" : ua.includes("Linux") ? "Linux" : "";
+    return os ? `Edge on ${os}` : "Edge";
+  }
+  if (ua.includes("Chrome/") && !ua.includes("Edg/")) {
+    const os = ua.includes("Windows") ? "Windows" : ua.includes("Mac") ? "macOS" : ua.includes("Linux") ? "Linux" : "";
+    return os ? `Chrome on ${os}` : "Chrome";
+  }
+  if (ua.includes("Firefox/")) {
+    const os = ua.includes("Windows") ? "Windows" : ua.includes("Mac") ? "macOS" : ua.includes("Linux") ? "Linux" : "";
+    return os ? `Firefox on ${os}` : "Firefox";
+  }
+  if (ua.includes("Safari/") && !ua.includes("Chrome/")) {
+    return ua.includes("Mac") ? "Safari on macOS" : "Safari";
+  }
+  return ua.length > 50 ? ua.slice(0, 50) + "..." : ua;
+}
+
+// ---------------------------------------------------------------------------
+// Sessions Card (used in SecurityTab)
+// ---------------------------------------------------------------------------
+
+interface Session {
+  id: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  expiresAt: string;
+  isCurrent: boolean;
+}
+
+function SessionsCard() {
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [revokingAll, setRevokingAll] = useState(false);
+
+  const fetchSessions = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await apiGet<{ sessions: Session[] }>("/api/v1/auth/sessions");
+      setSessions(data.sessions);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to load sessions.";
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
+
+  const handleRevoke = async (sessionId: string) => {
+    setRevokingId(sessionId);
+    try {
+      await apiDelete(`/api/v1/auth/sessions/${sessionId}`);
+      toast.success("Session revoked.");
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to revoke session.";
+      toast.error(message);
+    } finally {
+      setRevokingId(null);
+    }
+  };
+
+  const handleRevokeAll = async () => {
+    setRevokingAll(true);
+    try {
+      const data = await apiDelete<{ revokedCount: number }>("/api/v1/auth/sessions");
+      toast.success(`Revoked ${data.revokedCount} other session(s).`);
+      setSessions((prev) => prev.filter((s) => s.isCurrent));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to revoke sessions.";
+      toast.error(message);
+    } finally {
+      setRevokingAll(false);
+    }
+  };
+
+  const otherSessions = sessions.filter((s) => !s.isCurrent);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Globe className="h-4 w-4 text-[hsl(var(--primary))]" />
+              Active Sessions
+            </CardTitle>
+            <CardDescription>
+              Devices and browsers currently signed in to your account.
+            </CardDescription>
+          </div>
+          {otherSessions.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRevokeAll}
+              disabled={revokingAll}
+              className="text-[hsl(var(--destructive))] border-[hsl(var(--destructive)/0.3)] hover:bg-[hsl(var(--destructive)/0.1)]"
+            >
+              {revokingAll ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Revoking...
+                </>
+              ) : (
+                "Revoke All Other Sessions"
+              )}
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-[hsl(var(--muted-foreground))]" />
+            <span className="ml-2 text-sm text-[hsl(var(--muted-foreground))]">Loading sessions...</span>
+          </div>
+        ) : sessions.length === 0 ? (
+          <div className="flex items-center gap-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] px-4 py-6">
+            <Info className="h-5 w-5 shrink-0 text-[hsl(var(--muted-foreground))]" />
+            <p className="text-sm text-[hsl(var(--muted-foreground))]">No active sessions found.</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Browser</TableHead>
+                <TableHead>IP Address</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sessions.map((session) => (
+                <TableRow key={session.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">{parseBrowser(session.userAgent)}</span>
+                      {session.isCurrent && (
+                        <Badge variant="success" className="text-[10px]">Current</Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <code className="text-xs font-mono text-[hsl(var(--muted-foreground))]">
+                      {session.ipAddress ?? "Unknown"}
+                    </code>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-[hsl(var(--muted-foreground))]">
+                      {new Date(session.createdAt).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {!session.isCurrent && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRevoke(session.id)}
+                        disabled={revokingId === session.id}
+                        className="text-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.1)]"
+                      >
+                        {revokingId === session.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Trash2 className="h-4 w-4" />
+                            Revoke
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MFA Card (used in SecurityTab)
+// ---------------------------------------------------------------------------
+
+function MfaCard() {
+  const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Setup flow state
+  const [setupPhase, setSetupPhase] = useState<"idle" | "qr">("idle");
+  const [qrUrl, setQrUrl] = useState("");
+  const [secret, setSecret] = useState("");
+  const [verifyCode, setVerifyCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+
+  // Disable flow state
+  const [disablePhase, setDisablePhase] = useState<"idle" | "confirming">(
+    "idle"
+  );
+  const [disableCode, setDisableCode] = useState("");
+  const [disabling, setDisabling] = useState(false);
+
+  // Check MFA status on mount
+  useEffect(() => {
+    let cancelled = false;
+    async function checkMfaStatus() {
+      try {
+        const data = await apiGet<{ mfaEnabled: boolean }>(
+          "/api/v1/auth/mfa/status"
+        );
+        if (!cancelled) {
+          setMfaEnabled(data.mfaEnabled);
+        }
+      } catch {
+        if (!cancelled) {
+          // Endpoint may not exist yet -- default to not enabled
+          setMfaEnabled(false);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    checkMfaStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleStartSetup = async () => {
+    setSetupPhase("qr");
+    try {
+      const data = await apiPost<{ qrCodeUrl: string; secret: string }>(
+        "/api/v1/auth/mfa/setup"
+      );
+      setQrUrl(data.qrCodeUrl);
+      setSecret(data.secret);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to start MFA setup.";
+      toast.error(message);
+      setSetupPhase("idle");
+    }
+  };
+
+  const handleVerifySetup = async () => {
+    if (!verifyCode || verifyCode.length < 6) {
+      toast.error("Please enter a valid 6-digit code.");
+      return;
+    }
+    setVerifying(true);
+    try {
+      await apiPost("/api/v1/auth/mfa/verify-setup", { code: verifyCode });
+      toast.success("Two-factor authentication enabled successfully.");
+      setMfaEnabled(true);
+      setSetupPhase("idle");
+      setQrUrl("");
+      setSecret("");
+      setVerifyCode("");
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Invalid verification code.";
+      toast.error(message);
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleDisableMfa = async () => {
+    if (!disableCode || disableCode.length < 6) {
+      toast.error("Please enter a valid 6-digit code.");
+      return;
+    }
+    setDisabling(true);
+    try {
+      await apiPost("/api/v1/auth/mfa/disable", { code: disableCode });
+      toast.success("Two-factor authentication has been disabled.");
+      setMfaEnabled(false);
+      setDisablePhase("idle");
+      setDisableCode("");
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to disable MFA.";
+      toast.error(message);
+    } finally {
+      setDisabling(false);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        toast.success("Copied to clipboard.");
+      })
+      .catch(() => {
+        toast.error("Failed to copy.");
+      });
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Shield className="h-4 w-4 text-[hsl(var(--primary))]" />
+            Two-Factor Authentication
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-[hsl(var(--muted-foreground))]" />
+            <span className="ml-2 text-sm text-[hsl(var(--muted-foreground))]">
+              Checking MFA status...
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ---- MFA Enabled State ----
+  if (mfaEnabled) {
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--success)/0.1)]">
+                <ShieldCheck className="h-4 w-4 text-[hsl(var(--success))]" />
+              </div>
+              <div>
+                <CardTitle className="text-base">
+                  Two-Factor Authentication
+                </CardTitle>
+                <CardDescription>
+                  Your account is protected with TOTP-based two-factor
+                  authentication.
+                </CardDescription>
+              </div>
+            </div>
+            <Badge variant="success">Enabled</Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {disablePhase === "idle" ? (
+            <div className="flex items-center justify-between rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.15)] px-4 py-3">
+              <div className="flex items-center gap-3">
+                <Smartphone className="h-5 w-5 text-[hsl(var(--muted-foreground))]" />
+                <div>
+                  <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+                    Authenticator app connected
+                  </p>
+                  <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                    You will be prompted for a code on each login.
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDisablePhase("confirming")}
+                className="text-[hsl(var(--destructive))] border-[hsl(var(--destructive)/0.3)] hover:bg-[hsl(var(--destructive)/0.05)]"
+              >
+                <ShieldOff className="h-4 w-4" />
+                Disable MFA
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.04)] p-4">
+                <div className="flex items-start gap-2 mb-3">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--destructive))]" />
+                  <p className="text-sm text-[hsl(var(--destructive))]">
+                    Disabling MFA will reduce the security of your account.
+                    Enter your current authenticator code to confirm.
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="disable-mfa-code"
+                      className="text-xs font-medium text-[hsl(var(--muted-foreground))]"
+                    >
+                      Authenticator Code
+                    </Label>
+                    <Input
+                      id="disable-mfa-code"
+                      value={disableCode}
+                      onChange={(e) =>
+                        setDisableCode(
+                          e.target.value.replace(/\D/g, "").slice(0, 6)
+                        )
+                      }
+                      placeholder="Enter 6-digit code"
+                      maxLength={6}
+                      className="h-10 max-w-xs font-mono tracking-widest"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleDisableMfa}
+                      disabled={disabling || disableCode.length < 6}
+                    >
+                      {disabling ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Disabling...
+                        </>
+                      ) : (
+                        "Confirm Disable"
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setDisablePhase("idle");
+                        setDisableCode("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ---- MFA Not Enabled State ----
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--primary)/0.1)]">
+            <Shield className="h-4 w-4 text-[hsl(var(--primary))]" />
+          </div>
+          <div>
+            <CardTitle className="text-base">
+              Two-Factor Authentication
+            </CardTitle>
+            <CardDescription>
+              Add an extra layer of security to your account using a TOTP
+              authenticator app.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {setupPhase === "idle" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.15)] px-4 py-3">
+              <Info className="h-5 w-5 shrink-0 text-[hsl(var(--muted-foreground))]" />
+              <div>
+                <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+                  MFA is not enabled
+                </p>
+                <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                  Protect your account by requiring a time-based one-time
+                  password (TOTP) at login. Works with Google Authenticator,
+                  Authy, 1Password, and similar apps.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={handleStartSetup}
+              className="bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(230_65%_55%)] text-white shadow-md hover:shadow-lg hover:brightness-110 transition-all duration-200"
+            >
+              <Shield className="h-4 w-4" />
+              Enable MFA
+            </Button>
+          </div>
+        )}
+
+        {setupPhase === "qr" && !qrUrl && (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-[hsl(var(--muted-foreground))]" />
+            <span className="ml-2 text-sm text-[hsl(var(--muted-foreground))]">
+              Generating setup code...
+            </span>
+          </div>
+        )}
+
+        {setupPhase === "qr" && qrUrl && (
+          <div className="space-y-5">
+            {/* Step 1: QR Code */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Badge variant="default" className="text-[10px]">
+                  Step 1
+                </Badge>
+                <span className="text-sm font-medium text-[hsl(var(--foreground))]">
+                  Scan QR code with your authenticator app
+                </span>
+              </div>
+              <div className="inline-block rounded-lg border border-[hsl(var(--border))] bg-white p-4">
+                <img
+                  src={qrUrl}
+                  alt="MFA QR Code"
+                  className="h-48 w-48"
+                  onError={(e) => {
+                    // If the QR URL is not a renderable image, hide img and show URL as text
+                    (e.target as HTMLImageElement).style.display = "none";
+                    const fallback =
+                      document.getElementById("mfa-qr-fallback");
+                    if (fallback) fallback.style.display = "block";
+                  }}
+                />
+                <div id="mfa-qr-fallback" className="hidden">
+                  <p className="mb-1 text-xs text-[hsl(var(--muted-foreground))]">
+                    QR image could not load. Use this URI in your authenticator
+                    app:
+                  </p>
+                  <code className="select-all break-all font-mono text-xs text-[hsl(var(--foreground)/0.85)]">
+                    {qrUrl}
+                  </code>
+                </div>
+              </div>
+              <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                If you cannot scan the QR code, enter the setup key manually in
+                your authenticator app.
+              </p>
+            </div>
+
+            {/* Step 2: Manual Secret */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Badge variant="default" className="text-[10px]">
+                  Step 2
+                </Badge>
+                <span className="text-sm font-medium text-[hsl(var(--foreground))]">
+                  Or enter this secret manually
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] px-4 py-2.5">
+                  <code className="select-all break-all font-mono text-sm text-[hsl(var(--foreground)/0.85)]">
+                    {secret}
+                  </code>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => copyToClipboard(secret)}
+                  className="shrink-0"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                Save this secret in a safe place. You can use it to re-add your
+                account to an authenticator app if you lose access.
+              </p>
+            </div>
+
+            <Separator />
+
+            {/* Step 3: Verify */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Badge variant="default" className="text-[10px]">
+                  Step 3
+                </Badge>
+                <span className="text-sm font-medium text-[hsl(var(--foreground))]">
+                  Enter the code from your authenticator app
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="mfa-verify-code"
+                  className="text-xs font-medium text-[hsl(var(--muted-foreground))]"
+                >
+                  Verification Code
+                </Label>
+                <Input
+                  id="mfa-verify-code"
+                  value={verifyCode}
+                  onChange={(e) =>
+                    setVerifyCode(
+                      e.target.value.replace(/\D/g, "").slice(0, 6)
+                    )
+                  }
+                  placeholder="Enter 6-digit code"
+                  maxLength={6}
+                  className="h-10 max-w-xs font-mono tracking-widest"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleVerifySetup}
+                  disabled={verifying || verifyCode.length < 6}
+                  className="bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(230_65%_55%)] text-white shadow-md hover:shadow-lg hover:brightness-110 transition-all duration-200"
+                >
+                  {verifying ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="h-4 w-4" />
+                      Verify & Enable
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSetupPhase("idle");
+                    setQrUrl("");
+                    setSecret("");
+                    setVerifyCode("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Tab: Security
 // ---------------------------------------------------------------------------
 
@@ -305,57 +996,10 @@ function SecurityTab() {
   return (
     <div className="space-y-6">
       {/* Two-Factor Authentication */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Shield className="h-4 w-4 text-[hsl(var(--primary))]" />
-            Two-Factor Authentication
-          </CardTitle>
-          <CardDescription>
-            Add an extra layer of security to your account.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center py-6 text-center">
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[hsl(var(--muted))]">
-              <Shield className="h-6 w-6 text-[hsl(var(--muted-foreground))]" />
-            </div>
-            <p className="text-sm font-medium text-[hsl(var(--foreground))]">
-              Coming soon
-            </p>
-            <p className="mt-1 max-w-xs text-xs text-[hsl(var(--muted-foreground))]">
-              Two-factor authentication support is planned for a future release.
-              You will be able to use TOTP authenticator apps for enhanced account security.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <MfaCard />
 
       {/* Active Sessions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Globe className="h-4 w-4 text-[hsl(var(--primary))]" />
-            Active Sessions
-          </CardTitle>
-          <CardDescription>
-            Devices and browsers currently signed in to your account.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.3)] px-4 py-6">
-            <Info className="h-5 w-5 shrink-0 text-[hsl(var(--muted-foreground))]" />
-            <div>
-              <p className="text-sm font-medium text-[hsl(var(--foreground))]">
-                No other active sessions
-              </p>
-              <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
-                Session management API is not yet available. Your current session is managed via your auth token.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <SessionsCard />
 
       {/* Password Policy */}
       <Card>
@@ -376,11 +1020,15 @@ function SecurityTab() {
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-[hsl(var(--success))]" />
-              <span className="text-sm">Must include uppercase and lowercase letters</span>
+              <span className="text-sm">
+                Must include uppercase and lowercase letters
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-[hsl(var(--success))]" />
-              <span className="text-sm">Must include at least one number</span>
+              <span className="text-sm">
+                Must include at least one number
+              </span>
             </div>
           </div>
         </CardContent>
@@ -442,18 +1090,27 @@ function GeneralTab() {
     return () => { cancelled = true; };
   }, []);
 
-  const handleSaveSettings = () => {
+  const handleSaveSettings = async () => {
     setSavingSettings(true);
-    // TODO: POST /api/v1/admin/settings when endpoint is built
-    setTimeout(() => {
-      console.log("[Settings] General settings saved (local only -- API not yet available)", {
-        portalName,
-        supportEmail,
-        licenseDuration,
-        trialDuration,
+    try {
+      await apiPatch("/api/v1/admin/settings", {
+        settings: [
+          { key: "portalName", value: portalName },
+          { key: "supportEmail", value: supportEmail },
+          { key: "defaultLicenseDurationMonths", value: licenseDuration },
+          { key: "defaultTrialDurationDays", value: trialDuration },
+          { key: "maintenanceMode", value: String(maintenanceMode) },
+          { key: "maintenanceMessage", value: maintenanceMsg },
+        ],
       });
+      setSettingsError(null);
+      toast.success("Settings saved successfully.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to save settings.";
+      toast.error(message);
+    } finally {
       setSavingSettings(false);
-    }, 400);
+    }
   };
 
   const handleTestConnection = useCallback(async () => {

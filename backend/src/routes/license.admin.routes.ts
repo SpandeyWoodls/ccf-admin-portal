@@ -9,7 +9,7 @@ import { paginated } from "../lib/response.js";
 import { parsePagination } from "../lib/pagination.js";
 import { addDays, addMonths, addYears } from "date-fns";
 import { sendEmail } from "../services/email.js";
-import { licenseRevokedEmail, welcomeEmail, licenseSuspendedEmail } from "../services/email-templates.js";
+import { licenseRevokedEmail, welcomeEmail, licenseSuspendedEmail, licenseRenewedEmail } from "../services/email-templates.js";
 
 const router = Router();
 
@@ -123,7 +123,13 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
       where.tier = req.query.tier as string;
     }
 
-    if (req.query.organizationId) where.organizationId = req.query.organizationId;
+    if (req.query.organizationId && typeof req.query.organizationId === "string") {
+      // Validate UUID format to prevent injection of arbitrary Prisma operators
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(req.query.organizationId)) {
+        where.organizationId = req.query.organizationId;
+      }
+    }
 
     const search = typeof req.query.search === "string" ? req.query.search.slice(0, 200) : undefined;
     if (search) {
@@ -194,6 +200,7 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
         issuedBy: { select: { id: true, name: true, email: true } },
         activations: {
           orderBy: { activatedAt: "desc" },
+          take: 200,
         },
         events: {
           orderBy: { createdAt: "desc" },
@@ -498,6 +505,27 @@ router.post(
         userAgent: req.headers["user-agent"] ?? null,
       });
 
+      // Fire-and-forget: notify organization about license suspension
+      if (existing.organizationId) {
+        prisma.organization
+          .findUnique({ where: { id: existing.organizationId }, select: { name: true, email: true } })
+          .then((org) => {
+            if (org?.email) {
+              const { subject, html } = licenseSuspendedEmail(
+                org.name,
+                existing.licenseKey,
+                req.body.reason ?? null,
+              );
+              sendEmail(org.email, subject, html).catch(err => {
+                console.error(`[Email] Suspend notification failed:`, err.message);
+              });
+            }
+          })
+          .catch(err => {
+            console.error(`[Email] Failed to fetch org for suspend notification:`, err.message);
+          });
+      }
+
       res.json({ success: true, data: updated, error: null, message: "License suspended" });
     } catch (err) {
       next(err);
@@ -684,6 +712,27 @@ router.post(
         userAgent: req.headers["user-agent"] ?? null,
       });
 
+      // Fire-and-forget: notify organization about license renewal
+      if (existing.organizationId) {
+        prisma.organization
+          .findUnique({ where: { id: existing.organizationId }, select: { name: true, email: true } })
+          .then((org) => {
+            if (org?.email) {
+              const { subject, html } = licenseRenewedEmail(
+                org.name,
+                existing.licenseKey,
+                newValidUntil.toISOString(),
+              );
+              sendEmail(org.email, subject, html).catch(err => {
+                console.error(`[Email] Renewal notification failed:`, err.message);
+              });
+            }
+          })
+          .catch(err => {
+            console.error(`[Email] Failed to fetch org for renewal notification:`, err.message);
+          });
+      }
+
       res.json({ success: true, data: updated, error: null, message: `License renewed for ${body.duration}` });
     } catch (err) {
       next(err);
@@ -701,6 +750,7 @@ router.get("/:id/activations", async (req: Request, res: Response, next: NextFun
     const activations = await prisma.licenseActivation.findMany({
       where: { licenseId: req.params.id as string },
       orderBy: { activatedAt: "desc" },
+      take: 500,
     });
 
     res.json({ success: true, data: activations, error: null, message: "" });

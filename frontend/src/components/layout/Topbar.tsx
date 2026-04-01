@@ -3,6 +3,7 @@ import { Search, Bell, Sun, Moon, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useState } from "react";
+import { useLicenseStore } from "@/stores/licenseStore";
 
 const routeTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -17,7 +18,7 @@ const routeTitles: Record<string, string> = {
   "/settings": "Settings",
 };
 
-function getBreadcrumbs(pathname: string): { label: string; href?: string }[] {
+function getBreadcrumbs(pathname: string, detailLabel?: string): { label: string; href?: string }[] {
   const crumbs: { label: string; href?: string }[] = [{ label: "Home", href: "/dashboard" }];
   const segments = pathname.split("/").filter(Boolean);
 
@@ -28,7 +29,7 @@ function getBreadcrumbs(pathname: string): { label: string; href?: string }[] {
       crumbs.push({ label: title });
     } else {
       crumbs.push({ label: title, href: mainPath });
-      crumbs.push({ label: segments[1].toUpperCase().slice(0, 8) + "..." });
+      crumbs.push({ label: detailLabel || segments[1].toUpperCase().slice(0, 8) + "..." });
     }
   }
 
@@ -43,10 +44,18 @@ interface TopbarProps {
 export function Topbar({ onMobileMenuToggle, onSearchClick }: TopbarProps) {
   const location = useLocation();
   const [isDark, setIsDark] = useState(true);
-  const breadcrumbs = getBreadcrumbs(location.pathname);
+  const selectedLicense = useLicenseStore((s) => s.selectedLicense);
+
+  // Resolve a human-readable label for detail pages
+  const segments = location.pathname.split("/").filter(Boolean);
+  let detailLabel: string | undefined;
+  if (segments[0] === "licenses" && segments.length === 2 && selectedLicense) {
+    detailLabel = selectedLicense.licenseKey;
+  }
+
+  const breadcrumbs = getBreadcrumbs(location.pathname, detailLabel);
 
   // Find the page title
-  const segments = location.pathname.split("/").filter(Boolean);
   const mainPath = segments.length > 0 ? `/${segments[0]}` : "/dashboard";
   const pageTitle = routeTitles[mainPath] || "Dashboard";
 

@@ -63,7 +63,7 @@ The project has a well-structured foundation for installer customization:
 
 **Legal directory:** `legal/` contains EULA.md, TERMS_OF_SERVICE.md, PRIVACY_POLICY.md, DATA_PROCESSING_AGREEMENT.md, EXPORT_CONTROL.md, and compliance templates.
 
-**Updater already configured** with signed endpoints at `license.cyberchakra.in`.
+**Updater already configured** with signed endpoints at `cyberchakra.online`.
 
 **Onboarding already implemented** in the frontend (`src/stores/onboardingStore.ts`) with steps: welcome, compatibility_check, storage_setup, license_choice, trial_request, trial_pending, license_activation, admin_setup, complete.
 
@@ -525,7 +525,7 @@ The app should support offline activation for air-gapped environments:
 1. User runs app -> "Activate License" screen
 2. App generates Machine Request Code (hardware fingerprint + nonce)
 3. User copies code to USB -> takes to connected machine
-4. Visits https://license.cyberchakra.in/offline-activate
+4. Visits https://cyberchakra.online/offline-activate
 5. Enters request code + license key -> gets Activation Response Code
 6. User copies response code back to air-gapped machine via USB
 7. App validates response code (signed by license server's private key)
@@ -555,7 +555,7 @@ The project already has the updater configured:
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://license.cyberchakra.in/api/update-check.php?target={{target}}&arch={{arch}}&current_version={{current_version}}"
+        "https://cyberchakra.online/api/update-check.php?target={{target}}&arch={{arch}}&current_version={{current_version}}"
       ],
       "pubkey": "dW50cnVzdGVkIGNv..."
     }
@@ -580,11 +580,11 @@ The project already has the updater configured:
   "platforms": {
     "windows-x86_64": {
       "signature": "base64-encoded-signature",
-      "url": "https://releases.cyberchakra.in/v2.1.0/CCF_2.1.0_x64-setup.nsis.zip"
+      "url": "https://releases.cyberchakra.online/v2.1.0/CCF_2.1.0_x64-setup.nsis.zip"
     },
     "linux-x86_64": {
       "signature": "base64-encoded-signature",
-      "url": "https://releases.cyberchakra.in/v2.1.0/CCF_2.1.0_amd64.AppImage.tar.gz"
+      "url": "https://releases.cyberchakra.online/v2.1.0/CCF_2.1.0_amd64.AppImage.tar.gz"
     }
   }
 }
@@ -870,7 +870,7 @@ signtool sign /sha1 $THUMBPRINT /tr http://timestamp.digicert.com /td sha1 /fd s
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https: http://asset.localhost asset:; font-src 'self' https:; connect-src 'self' https://license.cyberchakra.in https://api.cyberchakra.in https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com https://login.microsoftonline.com https://graph.microsoft.com https://api.dropbox.com https://api.twitter.com https://localhost:*; frame-src https://accounts.google.com https://login.microsoftonline.com https://www.dropbox.com https://api.twitter.com; object-src 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com https://login.microsoftonline.com"
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https: http://asset.localhost asset:; font-src 'self' https:; connect-src 'self' https://cyberchakra.online https://api.cyberchakra.online https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com https://login.microsoftonline.com https://graph.microsoft.com https://api.dropbox.com https://api.twitter.com https://localhost:*; frame-src https://accounts.google.com https://login.microsoftonline.com https://www.dropbox.com https://api.twitter.com; object-src 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com https://login.microsoftonline.com"
     },
     "withGlobalTauri": true
   },
@@ -945,7 +945,7 @@ signtool sign /sha1 $THUMBPRINT /tr http://timestamp.digicert.com /td sha1 /fd s
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://license.cyberchakra.in/api/update-check.php?target={{target}}&arch={{arch}}&current_version={{current_version}}"
+        "https://cyberchakra.online/api/update-check.php?target={{target}}&arch={{arch}}&current_version={{current_version}}"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY4NjM1RDY2QTM2OERDMUYKUldRZjNHaWpabDFqYUFaRkZPYndDQ3dwZ3lvMXBSbUdVWlVLalZEN0gxVTF3Wnljcks4aHZvSmkK"
     }

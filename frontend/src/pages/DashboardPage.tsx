@@ -1,11 +1,10 @@
-import { useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useCallback, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   KeyRound,
   AlertTriangle,
   Building2,
   FlaskConical,
-  IndianRupee,
   Activity,
   Clock,
   CheckCircle2,
@@ -14,6 +13,9 @@ import {
   Package,
   RefreshCw,
   BarChart3,
+  Plus,
+  ArrowRight,
+  ServerCrash,
 } from "lucide-react";
 import {
   PieChart,
@@ -33,10 +35,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 // Table imports removed -- activity section now uses a timeline layout
+import { CreateLicenseDialog } from "@/components/licenses/CreateLicenseDialog";
+import { CreateOrgDialog } from "@/components/organizations/CreateOrgDialog";
 import { useDashboardStore } from "@/stores/dashboardStore";
 import type { DashboardStats } from "@/stores/dashboardStore";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // Helpers to map API activity events to the original visual format
@@ -202,7 +205,10 @@ function ChartSkeleton() {
 // ---------------------------------------------------------------------------
 
 export function DashboardPage() {
-  const { stats, isLoading, fetchStats } = useDashboardStore();
+  const { stats, isLoading, error, fetchStats } = useDashboardStore();
+  const navigate = useNavigate();
+  const [createLicenseOpen, setCreateLicenseOpen] = useState(false);
+  const [createOrgOpen, setCreateOrgOpen] = useState(false);
 
   const handleRefresh = useCallback(() => {
     fetchStats();
@@ -246,20 +252,6 @@ export function DashboardPage() {
       icon: FlaskConical,
       color: "hsl(var(--chart-4))",
     },
-    {
-      label: "Monthly Revenue",
-      value: formatCurrency(stats?.monthlyRevenue ?? 0),
-      trend: "this month",
-      icon: IndianRupee,
-      color: "hsl(var(--chart-2))",
-    },
-    {
-      label: "Version Adoption",
-      value: `${Math.round(stats?.versionAdoption ?? 0)}%`,
-      trend: "on latest",
-      icon: Package,
-      color: "hsl(var(--chart-1))",
-    },
   ];
 
   // ---------------------------------------------------------------------------
@@ -279,8 +271,6 @@ export function DashboardPage() {
   const activationsData = (stats?.activationsOverTime ?? []).map((entry) => ({
     month: entry.month.length > 3 ? formatMonthLabel(entry.month) : entry.month,
     activations: entry.count,
-    // The API only provides a single count; deactivations are estimated or zero
-    deactivations: Math.round(entry.count * 0.15),
   }));
 
   // ---------------------------------------------------------------------------
@@ -315,10 +305,30 @@ export function DashboardPage() {
         </Button>
       </div>
 
+      {/* Error State */}
+      {error && !isLoading && (
+        <Card className="border-[hsl(var(--destructive)/0.4)] bg-[hsl(var(--destructive)/0.06)]">
+          <CardContent className="flex items-center gap-3 p-4">
+            <ServerCrash className="h-5 w-5 shrink-0 text-[hsl(var(--destructive))]" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+                Failed to load dashboard data
+              </p>
+              <p className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5 truncate">
+                {error}
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleRefresh}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* KPI Cards */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {isLoading && !stats
-          ? Array.from({ length: 6 }).map((_, i) => <KpiCardSkeleton key={i} />)
+          ? Array.from({ length: 4 }).map((_, i) => <KpiCardSkeleton key={i} />)
           : kpiData.map((kpi) => (
               <Card
                 key={kpi.label}
@@ -362,6 +372,51 @@ export function DashboardPage() {
                 </CardContent>
               </Card>
             ))}
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+        <button
+          onClick={() => navigate("/trials")}
+          className="group flex items-center gap-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 text-left transition-colors hover:border-[hsl(var(--chart-4)/0.5)] hover:bg-[hsl(var(--chart-4)/0.04)]"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[hsl(var(--chart-4)/0.12)]">
+            <FlaskConical className="h-4 w-4 text-[hsl(var(--chart-4))]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-[hsl(var(--foreground))]">Approve Trials</p>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">Review pending trial requests</p>
+          </div>
+          <ArrowRight className="h-4 w-4 text-[hsl(var(--muted-foreground))] opacity-0 transition-opacity group-hover:opacity-100" />
+        </button>
+
+        <button
+          onClick={() => setCreateLicenseOpen(true)}
+          className="group flex items-center gap-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 text-left transition-colors hover:border-[hsl(var(--chart-1)/0.5)] hover:bg-[hsl(var(--chart-1)/0.04)]"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[hsl(var(--chart-1)/0.12)]">
+            <Plus className="h-4 w-4 text-[hsl(var(--chart-1))]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-[hsl(var(--foreground))]">Create License</p>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">Issue a new license key</p>
+          </div>
+          <ArrowRight className="h-4 w-4 text-[hsl(var(--muted-foreground))] opacity-0 transition-opacity group-hover:opacity-100" />
+        </button>
+
+        <button
+          onClick={() => setCreateOrgOpen(true)}
+          className="group flex items-center gap-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 text-left transition-colors hover:border-[hsl(var(--chart-2)/0.5)] hover:bg-[hsl(var(--chart-2)/0.04)]"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[hsl(var(--chart-2)/0.12)]">
+            <Building2 className="h-4 w-4 text-[hsl(var(--chart-2))]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-[hsl(var(--foreground))]">Create Organization</p>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">Register a new client org</p>
+          </div>
+          <ArrowRight className="h-4 w-4 text-[hsl(var(--muted-foreground))] opacity-0 transition-opacity group-hover:opacity-100" />
+        </button>
       </div>
 
       {/* Charts */}
@@ -582,15 +637,6 @@ export function DashboardPage() {
                           activeDot={{ r: 5 }}
                           name="Activations"
                         />
-                        <Line
-                          type="monotone"
-                          dataKey="deactivations"
-                          stroke="hsl(0, 62%, 50%)"
-                          strokeWidth={2}
-                          dot={{ fill: "hsl(0, 62%, 50%)", r: 3 }}
-                          strokeDasharray="5 5"
-                          name="Deactivations"
-                        />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -620,8 +666,11 @@ export function DashboardPage() {
           {activityRows.length === 0 ? (
             <div className="flex h-32 flex-col items-center justify-center gap-2">
               <Clock className="h-5 w-5 text-[hsl(var(--muted-foreground))] opacity-40" />
-              <p className="text-sm text-[hsl(var(--muted-foreground))]">
+              <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
                 No recent activity
+              </p>
+              <p className="text-xs text-[hsl(var(--muted-foreground))] opacity-70">
+                License events and admin actions will appear here as they happen
               </p>
             </div>
           ) : (
@@ -665,6 +714,17 @@ export function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Quick-action dialogs */}
+      <CreateLicenseDialog
+        open={createLicenseOpen}
+        onOpenChange={setCreateLicenseOpen}
+        onCreated={handleRefresh}
+      />
+      <CreateOrgDialog
+        open={createOrgOpen}
+        onOpenChange={setCreateOrgOpen}
+      />
     </div>
   );
 }

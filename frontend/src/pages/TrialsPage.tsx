@@ -370,6 +370,7 @@ export function TrialsPage() {
   // Approve form state
   const [approveTier, setApproveTier] = useState("individual");
   const [approveDuration, setApproveDuration] = useState("14");
+  const [customDays, setCustomDays] = useState("");
   const [approveLoading, setApproveLoading] = useState(false);
   const [approveSuccess, setApproveSuccess] = useState<string | null>(null);
 
@@ -445,13 +446,14 @@ export function TrialsPage() {
     if (!selectedTrial) return;
     setApproveLoading(true);
     try {
-      const durationDays = parseInt(approveDuration, 10);
-      // Convert days to approximate months for the API (minimum 1)
-      const months = Math.max(1, Math.round(durationDays / 30));
+      const durationDays = approveDuration === "custom"
+        ? parseInt(customDays, 10)
+        : parseInt(approveDuration, 10);
+      if (!durationDays || durationDays < 1) return;
       const result = await approveTrialRequest(selectedTrial.id, {
         tier: approveTier,
-        months,
-      });
+        days: durationDays,
+      } as any);
       setApproveSuccess(result.licenseKey);
     } catch {
       // API failed -- error is already set in the store
@@ -930,11 +932,32 @@ export function TrialsPage() {
                     <SelectValue placeholder="Select duration" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="7">7 days</SelectItem>
                     <SelectItem value="14">14 days</SelectItem>
                     <SelectItem value="30">30 days</SelectItem>
                     <SelectItem value="60">60 days</SelectItem>
+                    <SelectItem value="90">90 days</SelectItem>
+                    <SelectItem value="180">180 days</SelectItem>
+                    <SelectItem value="365">1 year</SelectItem>
+                    <SelectItem value="730">2 years</SelectItem>
+                    <SelectItem value="1095">3 years</SelectItem>
+                    <SelectItem value="1825">5 years</SelectItem>
+                    <SelectItem value="custom">Custom...</SelectItem>
                   </SelectContent>
                 </Select>
+                {approveDuration === "custom" && (
+                  <div className="mt-2">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={1825}
+                      value={customDays}
+                      onChange={(e) => setCustomDays(e.target.value)}
+                      placeholder="Enter number of days (1-1825)"
+                      className="mt-1"
+                    />
+                  </div>
+                )}
               </div>
 
               <DialogFooter>

@@ -20,7 +20,8 @@ router.use(requireAuth);
 
 const approveTrialSchema = z.object({
   tier: z.enum(["individual", "team", "enterprise", "government"]),
-  months: z.number().int().min(1).max(12),
+  months: z.number().int().min(1).max(12).optional(),
+  days: z.number().int().min(1).max(1825).optional(),
 });
 
 const rejectTrialSchema = z.object({
@@ -120,35 +121,64 @@ router.post(
       // Generate a trial license key
       const licenseKey = generateLicenseKey();
       const validFrom = new Date();
-      const validUntil = addMonths(validFrom, body.months);
+      const validUntil = body.days
+        ? new Date(validFrom.getTime() + body.days * 24 * 60 * 60 * 1000)
+        : addMonths(validFrom, body.months ?? 1);
 
-      // Create the license record
-      const license = await prisma.license.create({
-        data: {
-          licenseKey,
-          licenseType: "trial",
-          tier: body.tier,
-          status: "issued",
-          maxActivations: 1,
-          validFrom,
-          validUntil,
-          issuedById: req.admin!.id,
-          notes: `Trial license for ${trial.fullName} (${trial.organization}). Request ID: ${trial.id}`,
-        },
-      });
+      // Create license and update trial atomically to prevent orphaned records
+      const { license, updated } = await prisma.$transaction(async (tx: any) => {
+        // Find or create organization from trial request data
+        let orgId: string | null = null;
+        if (trial.organization) {
+          const existingOrg = await tx.organization.findFirst({
+            where: { name: { equals: trial.organization } },
+          });
+          if (existingOrg) {
+            orgId = existingOrg.id;
+          } else {
+            const slug = trial.organization.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            const newOrg = await tx.organization.create({
+              data: {
+                name: trial.organization,
+                slug: slug || 'trial-org-' + Date.now(),
+                orgType: trial.organizationType || 'individual',
+                email: trial.email,
+                isActive: true,
+              },
+            });
+            orgId = newOrg.id;
+          }
+        }
 
-      // Update the trial request
-      const updated = await prisma.trialRequest.update({
-        where: { id: req.params.id as string },
-        data: {
-          status: "approved",
-          approvedLicenseKey: licenseKey,
-          reviewedAt: new Date(),
-          reviewedById: req.admin!.id,
-        },
-        include: {
-          reviewedBy: { select: { id: true, name: true, email: true } },
-        },
+        const license = await tx.license.create({
+          data: {
+            licenseKey,
+            licenseType: "trial",
+            tier: body.tier,
+            status: "issued",
+            maxActivations: 1,
+            validFrom,
+            validUntil,
+            issuedById: req.admin!.id,
+            organizationId: orgId,
+            notes: `Trial license for ${trial.fullName} (${trial.organization}). Request ID: ${trial.id}`,
+          },
+        });
+
+        const updated = await tx.trialRequest.update({
+          where: { id: req.params.id as string },
+          data: {
+            status: "approved",
+            approvedLicenseKey: licenseKey,
+            reviewedAt: new Date(),
+            reviewedById: req.admin!.id,
+          },
+          include: {
+            reviewedBy: { select: { id: true, name: true, email: true } },
+          },
+        });
+
+        return { license, updated };
       });
 
       await logAudit({

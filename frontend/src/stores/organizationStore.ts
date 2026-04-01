@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, apiDelete, ApiError } from "@/lib/api";
 import type { License } from "./licenseStore";
 
 // ---------------------------------------------------------------------------
@@ -71,6 +71,44 @@ interface BackendPaginatedResponse<T> {
 // No mock data -- stores return empty arrays on API failure
 
 // ---------------------------------------------------------------------------
+// Error helpers
+// ---------------------------------------------------------------------------
+
+/** Map known HTTP status codes to user-friendly messages */
+function friendlyError(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) {
+    switch (err.status) {
+      case 429:
+        return "Too many requests — please wait a moment and try again";
+      case 404:
+        return "The requested endpoint does not exist";
+      case 403:
+        return "You do not have permission to access this resource";
+      case 500:
+        return "Internal server error — please try again later";
+      case 502:
+      case 503:
+      case 504:
+        return "The server is temporarily unavailable — please try again later";
+      default:
+        return err.message || fallback;
+    }
+  }
+  if (err instanceof Error) {
+    return err.message;
+  }
+  return fallback;
+}
+
+// ---------------------------------------------------------------------------
+// Fetch deduplication — prevents React StrictMode double-mount from
+// firing two concurrent requests (which can trigger 429 rate-limits).
+// ---------------------------------------------------------------------------
+
+let activeFetchKey: string | null = null;
+let activeFetchPromise: Promise<void> | null = null;
+
+// ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
@@ -115,36 +153,56 @@ export const useOrganizationStore = create<OrganizationState>()(
     error: null,
 
     fetchOrganizations: async (search?: string, page?: number) => {
-      set({ isLoading: true, error: null });
-      try {
-        const params = new URLSearchParams();
-        if (search) params.set("search", search);
-        if (page) params.set("page", String(page));
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (page) params.set("page", String(page));
+      const fetchKey = `orgs:${params.toString()}`;
 
-        const raw = await apiGet<BackendPaginatedResponse<Organization>>(
-          `/api/v1/admin/organizations?${params.toString()}`,
-        );
-        set({
-          organizations: raw.items,
-          pagination: {
-            page: raw.page,
-            limit: raw.pageSize,
-            total: raw.total,
-            totalPages: raw.totalPages,
-          },
-          isLoading: false,
-        });
-      } catch (err) {
-        set({
-          organizations: [],
-          pagination: { ...DEFAULT_PAGINATION },
-          isLoading: false,
-          error:
-            err instanceof Error
-              ? err.message
-              : "Failed to fetch organizations",
-        });
+      // Deduplicate: if an identical request is already in flight, reuse it
+      if (activeFetchKey === fetchKey && activeFetchPromise) {
+        return activeFetchPromise;
       }
+
+      const doFetch = async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const raw = await apiGet<BackendPaginatedResponse<Organization>>(
+            `/api/v1/admin/organizations?${params.toString()}`,
+          );
+          set({
+            organizations: raw.items,
+            pagination: {
+              page: raw.page,
+              limit: raw.pageSize,
+              total: raw.total,
+              totalPages: raw.totalPages,
+            },
+            isLoading: false,
+          });
+        } catch (err) {
+          // On rate-limit (429), keep existing cached data instead of wiping it
+          const isRateLimit =
+            err instanceof ApiError && err.status === 429;
+          const { organizations: cached, pagination: cachedPag } = get();
+
+          set({
+            organizations: isRateLimit && cached.length > 0 ? cached : [],
+            pagination:
+              isRateLimit && cached.length > 0
+                ? cachedPag
+                : { ...DEFAULT_PAGINATION },
+            isLoading: false,
+            error: friendlyError(err, "Failed to fetch organizations"),
+          });
+        } finally {
+          activeFetchKey = null;
+          activeFetchPromise = null;
+        }
+      };
+
+      activeFetchKey = fetchKey;
+      activeFetchPromise = doFetch();
+      return activeFetchPromise;
     },
 
     fetchOrganization: async (id: string) => {
@@ -158,10 +216,7 @@ export const useOrganizationStore = create<OrganizationState>()(
         set({
           selectedOrg: null,
           isLoading: false,
-          error:
-            err instanceof Error
-              ? err.message
-              : "Failed to fetch organization details",
+          error: friendlyError(err, "Failed to fetch organization details"),
         });
       }
     },
@@ -182,10 +237,7 @@ export const useOrganizationStore = create<OrganizationState>()(
         console.error("Failed to create organization:", err);
         set({
           isLoading: false,
-          error:
-            err instanceof Error
-              ? err.message
-              : "Failed to create organization",
+          error: friendlyError(err, "Failed to create organization"),
         });
         throw err;
       }
@@ -213,10 +265,7 @@ export const useOrganizationStore = create<OrganizationState>()(
       } catch (err) {
         set({
           isLoading: false,
-          error:
-            err instanceof Error
-              ? err.message
-              : "Failed to update organization",
+          error: friendlyError(err, "Failed to update organization"),
         });
         throw err;
       }
@@ -248,8 +297,7 @@ export const useOrganizationStore = create<OrganizationState>()(
         console.error("Failed to add contact:", err);
         set({
           isLoading: false,
-          error:
-            err instanceof Error ? err.message : "Failed to add contact",
+          error: friendlyError(err, "Failed to add contact"),
         });
         throw err;
       }
@@ -264,10 +312,7 @@ export const useOrganizationStore = create<OrganizationState>()(
       } catch (err) {
         console.error("Failed to delete organization:", err);
         set({
-          error:
-            err instanceof Error
-              ? err.message
-              : "Failed to delete organization",
+          error: friendlyError(err, "Failed to delete organization"),
         });
         throw err;
       }

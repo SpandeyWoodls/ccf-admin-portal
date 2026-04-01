@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,6 +13,8 @@ import {
   ShieldBan,
   Rocket,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Copy,
   Check,
@@ -67,6 +69,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   useReleaseStore,
+  useReleasePagination,
   type Release,
   type ReleaseAsset,
 } from "@/stores/releaseStore";
@@ -1357,6 +1360,8 @@ export function ReleasesPage() {
     importAssets,
   } = useReleaseStore();
 
+  const pagination = useReleasePagination();
+
   const [createOpen, setCreateOpen] = useState(false);
   const [blockTarget, setBlockTarget] = useState<PageRelease | null>(null);
   const [editTarget, setEditTarget] = useState<PageRelease | null>(null);
@@ -1364,11 +1369,19 @@ export function ReleasesPage() {
   const [channelFilter, setChannelFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isImporting, setIsImporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const perPage = 20;
 
-  // Fetch releases on mount
+  // Fetch releases when page changes
+  const loadReleases = useCallback(() => {
+    fetchReleases({ page: currentPage, pageSize: perPage });
+  }, [fetchReleases, currentPage, perPage]);
+
   useEffect(() => {
-    fetchReleases();
-  }, [fetchReleases]);
+    loadReleases();
+  }, [loadReleases]);
+
+  const totalPages = pagination.totalPages || Math.ceil(pagination.total / perPage) || 1;
 
   // Map store releases to page releases (add default fields for assets etc.)
   const releases: PageRelease[] = useMemo(
@@ -1432,7 +1445,7 @@ export function ReleasesPage() {
     try {
       await publishRelease(id, force);
       toast.success("Release published!");
-      fetchReleases();
+      loadReleases();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to publish";
       if (msg.includes("NO_ASSETS") || msg.includes("No assets")) {
@@ -1464,7 +1477,7 @@ export function ReleasesPage() {
     try {
       await importAssets(releaseId);
       toast.success("Assets imported from GitHub successfully!");
-      fetchReleases();
+      loadReleases();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to import assets";
       if (msg.includes("GITHUB_RELEASE_NOT_FOUND") || msg.includes("No GitHub Release found")) {
@@ -1489,7 +1502,7 @@ export function ReleasesPage() {
       await updateRelease(editTarget.id, data);
       toast.success("Release updated");
       setEditTarget(null);
-      fetchReleases();
+      loadReleases();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update release");
     }
@@ -1639,11 +1652,65 @@ export function ReleasesPage() {
         </div>
       )}
 
-      {/* Results count */}
-      {filteredReleases.length > 0 && (
-        <p className="text-xs text-[hsl(var(--muted-foreground))]">
-          Showing {filteredReleases.length} of {releases.length} releases
-        </p>
+      {/* Pagination */}
+      {!isLoading && pagination.total > 0 && (
+        <div className="flex items-center justify-between rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-4 py-2.5">
+          <p className="text-xs text-[hsl(var(--muted-foreground))]">
+            <span className="font-medium text-[hsl(var(--foreground))]">
+              {(currentPage - 1) * perPage + 1}-{Math.min(currentPage * perPage, pagination.total)}
+            </span>
+            {" "}of {pagination.total}
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            {/* Page number indicators */}
+            <div className="hidden items-center gap-0.5 sm:flex">
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                let pageNum: number;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "h-7 w-7 p-0 text-xs",
+                      currentPage === pageNum && "pointer-events-none",
+                    )}
+                    onClick={() => setCurrentPage(pageNum)}
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((p) => p + 1)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* Create Release Dialog */}

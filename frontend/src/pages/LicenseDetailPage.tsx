@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   Pause,
@@ -12,8 +13,10 @@ import {
   AlertTriangle,
   XCircle,
   Trash2,
-  Copy,
   Loader2,
+  ClipboardCopy,
+  FlaskConical,
+  Link,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -151,23 +154,54 @@ const statusConfig: Record<
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "---";
-  return new Date(dateStr).toLocaleDateString("en-IN", {
-    day: "2-digit",
+  return new Date(dateStr).toLocaleDateString("en-US", {
     month: "short",
+    day: "numeric",
     year: "numeric",
   });
 }
 
 function formatDateTime(dateStr: string | null | undefined): string {
   if (!dateStr) return "---";
-  return new Date(dateStr).toLocaleDateString("en-IN", {
-    day: "2-digit",
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("en-US", {
     month: "short",
+    day: "numeric",
     year: "numeric",
-    hour: "2-digit",
+  }) + " at " + d.toLocaleTimeString("en-US", {
+    hour: "numeric",
     minute: "2-digit",
+    hour12: true,
   });
 }
+
+function isExpired(license: { validUntil: string | null; status: string }): boolean {
+  if (!license.validUntil) return false;
+  return new Date(license.validUntil).getTime() < Date.now();
+}
+
+// ---------------------------------------------------------------------------
+// License type badge config
+// ---------------------------------------------------------------------------
+
+const licenseTypeConfig: Record<string, { label: string; className: string }> = {
+  trial: {
+    label: "Trial",
+    className: "border-transparent bg-[hsl(var(--chart-4)/0.15)] text-[hsl(var(--chart-4))]",
+  },
+  perpetual: {
+    label: "Perpetual",
+    className: "border-transparent bg-[hsl(var(--success)/0.15)] text-[hsl(var(--success))]",
+  },
+  time_limited: {
+    label: "Time-Limited",
+    className: "border-transparent bg-[hsl(var(--warning)/0.15)] text-[hsl(var(--warning))]",
+  },
+  organization: {
+    label: "Organization",
+    className: "border-transparent bg-[hsl(var(--primary)/0.15)] text-[hsl(var(--primary))]",
+  },
+};
 
 function getEventDescription(event: { action: string; metadata: any; actorEmail: string | null; actorType: string }): {
   description: string;
@@ -265,8 +299,13 @@ export function LicenseDetailPage() {
       description: `Are you sure you want to suspend license ${license.licenseKey}? All active machines will lose access until the license is reinstated.`,
       variant: "default",
       onConfirm: async () => {
-        await suspendLicense(license.id);
-        setConfirmDialog((d) => ({ ...d, open: false }));
+        try {
+          await suspendLicense(license.id);
+          toast.success("License suspended");
+          setConfirmDialog((d) => ({ ...d, open: false }));
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Failed to suspend license");
+        }
       },
     });
   };
@@ -279,8 +318,13 @@ export function LicenseDetailPage() {
       description: `Are you sure you want to permanently revoke license ${license.licenseKey}? All activations will be immediately deactivated. This action is difficult to reverse.`,
       variant: "destructive",
       onConfirm: async () => {
-        await revokeLicense(license.id);
-        setConfirmDialog((d) => ({ ...d, open: false }));
+        try {
+          await revokeLicense(license.id);
+          toast.success("License revoked");
+          setConfirmDialog((d) => ({ ...d, open: false }));
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Failed to revoke license");
+        }
       },
     });
   };
@@ -293,16 +337,26 @@ export function LicenseDetailPage() {
       description: `Reinstate license ${license.licenseKey}? This will restore the license to active status.`,
       variant: "default",
       onConfirm: async () => {
-        await reinstateLicense(license.id);
-        setConfirmDialog((d) => ({ ...d, open: false }));
+        try {
+          await reinstateLicense(license.id);
+          toast.success("License reinstated");
+          setConfirmDialog((d) => ({ ...d, open: false }));
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Failed to reinstate license");
+        }
       },
     });
   };
 
   const handleRenew = async () => {
     if (!license) return;
-    await renewLicense(license.id, renewMonths);
-    setRenewDialog(false);
+    try {
+      await renewLicense(license.id, renewMonths);
+      toast.success(`License renewed for ${renewMonths} months`);
+      setRenewDialog(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to renew license");
+    }
   };
 
   const handleDeactivate = (activationId: string, machineName: string) => {
@@ -313,8 +367,13 @@ export function LicenseDetailPage() {
       description: `Deactivate ${machineName} from this license? The machine will need to be re-activated to use the software.`,
       variant: "destructive",
       onConfirm: async () => {
-        await deactivateMachine(license.id, activationId);
-        setConfirmDialog((d) => ({ ...d, open: false }));
+        try {
+          await deactivateMachine(license.id, activationId);
+          toast.success(`${machineName} deactivated`);
+          setConfirmDialog((d) => ({ ...d, open: false }));
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Failed to deactivate machine");
+        }
       },
     });
   };
@@ -374,6 +433,11 @@ export function LicenseDetailPage() {
     license.tier.charAt(0).toUpperCase() + license.tier.slice(1);
   const typeLabel =
     license.licenseType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const typeConfig = licenseTypeConfig[license.licenseType] || {
+    label: typeLabel,
+    className: "border-transparent bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))]",
+  };
+  const expired = isExpired(license);
 
   const activationPct =
     license.maxActivations > 0
@@ -393,31 +457,91 @@ export function LicenseDetailPage() {
         Back to Licenses
       </Button>
 
+      {/* Expired banner */}
+      {expired && (
+        <div className="flex items-center gap-3 rounded-lg border border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.08)] px-4 py-3">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-[hsl(var(--destructive))]" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-[hsl(var(--destructive))]">
+              License Expired
+            </p>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">
+              This license expired on {formatDate(license.validUntil)}. Renew it to restore access.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="shrink-0 border-[hsl(var(--destructive)/0.3)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.1)]"
+            onClick={() => setRenewDialog(true)}
+          >
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+            Renew Now
+          </Button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
           <div className="flex items-center gap-3">
-            <button
-              onClick={copyKey}
-              className="group flex items-center gap-2 font-mono text-xl font-bold tracking-tight text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] transition-colors cursor-pointer"
-              title="Click to copy license key"
-            >
+            <span className="font-mono text-xl font-bold tracking-tight text-[hsl(var(--foreground))]">
               {license.licenseKey}
-              <Copy
-                className={cn(
-                  "h-4 w-4 transition-colors",
-                  keyCopied
-                    ? "text-[hsl(var(--success))]"
-                    : "text-[hsl(var(--muted-foreground))] opacity-0 group-hover:opacity-100",
-                )}
-              />
-            </button>
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "gap-1.5 text-xs h-7 px-2.5",
+                keyCopied && "border-[hsl(var(--success))] text-[hsl(var(--success))]",
+              )}
+              onClick={copyKey}
+            >
+              {keyCopied ? (
+                <>
+                  <CheckCircle2 className="h-3 w-3" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <ClipboardCopy className="h-3 w-3" />
+                  Copy Key
+                </>
+              )}
+            </Button>
             <Badge variant={status.variant}>{status.label}</Badge>
+            <Badge className={cn("text-[10px] font-semibold", typeConfig.className)}>
+              {typeConfig.label}
+            </Badge>
           </div>
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">
-            {license.organization?.name || "No organization"} &middot;{" "}
-            {tierLabel} Tier &middot; {typeLabel}
-          </p>
+          <div className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
+            {license.organization ? (
+              <button
+                onClick={() => navigate(`/organizations/${license.organization!.id}`)}
+                className="hover:text-[hsl(var(--foreground))] transition-colors cursor-pointer underline-offset-2 hover:underline"
+              >
+                {license.organization.name}
+              </button>
+            ) : (
+              <span className="italic text-[hsl(var(--muted-foreground)/0.7)]">
+                No organization (trial license)
+              </span>
+            )}
+            <span>&middot;</span>
+            <span>{tierLabel} Tier</span>
+            {license.licenseType === "trial" && (
+              <>
+                <span>&middot;</span>
+                <button
+                  onClick={() => navigate("/trials")}
+                  className="inline-flex items-center gap-1 text-[hsl(var(--chart-4))] hover:underline underline-offset-2 cursor-pointer"
+                >
+                  <FlaskConical className="h-3 w-3" />
+                  View Trial Requests
+                </button>
+              </>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           {/* Contextual action buttons based on status */}
@@ -488,36 +612,101 @@ export function LicenseDetailPage() {
 
       {/* Info Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {[
-          {
-            label: "Organization",
-            value: license.organization?.name || "---",
-          },
-          { label: "Tier", value: tierLabel },
-          { label: "License Type", value: typeLabel },
-          { label: "Issued Date", value: formatDate(license.validFrom || license.createdAt) },
-          {
-            label: "Expires",
-            value: license.validUntil
-              ? formatDate(license.validUntil)
-              : "Perpetual",
-          },
-          {
-            label: "Issued By",
-            value: license.issuedBy?.name || "System",
-          },
-        ].map((item) => (
-          <Card key={item.label}>
-            <CardContent className="p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
-                {item.label}
+        {/* Organization */}
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+              Organization
+            </p>
+            {license.organization ? (
+              <button
+                onClick={() => navigate(`/organizations/${license.organization!.id}`)}
+                className="mt-1 text-sm font-semibold text-[hsl(var(--foreground))] hover:text-[hsl(var(--primary))] transition-colors cursor-pointer underline-offset-2 hover:underline inline-flex items-center gap-1"
+              >
+                {license.organization.name}
+                <Link className="h-3 w-3 opacity-50" />
+              </button>
+            ) : (
+              <p className="mt-1 text-sm italic text-[hsl(var(--muted-foreground)/0.7)]">
+                No organization (trial license)
               </p>
-              <p className="mt-1 text-sm font-semibold text-[hsl(var(--foreground))]">
-                {item.value}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Tier */}
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+              Tier
+            </p>
+            <p className="mt-1 text-sm font-semibold text-[hsl(var(--foreground))]">
+              {tierLabel}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* License Type */}
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+              License Type
+            </p>
+            <div className="mt-1">
+              <Badge className={cn("text-xs font-semibold", typeConfig.className)}>
+                {typeConfig.label}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Issued Date */}
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+              Issued Date
+            </p>
+            <p className="mt-1 text-sm font-semibold text-[hsl(var(--foreground))]">
+              {formatDate(license.validFrom || license.createdAt)}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Expires */}
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+              Expires
+            </p>
+            <p className={cn(
+              "mt-1 text-sm font-semibold",
+              expired
+                ? "text-[hsl(var(--destructive))]"
+                : "text-[hsl(var(--foreground))]",
+            )}>
+              {license.validUntil
+                ? formatDate(license.validUntil)
+                : "Never (Perpetual)"}
+              {expired && (
+                <span className="ml-1.5 text-xs font-normal text-[hsl(var(--destructive)/0.8)]">
+                  (expired)
+                </span>
+              )}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Issued By */}
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+              Issued By
+            </p>
+            <p className="mt-1 text-sm font-semibold text-[hsl(var(--foreground))]">
+              {license.issuedBy?.name || "System"}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Activations bar */}

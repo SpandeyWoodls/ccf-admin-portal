@@ -30,7 +30,7 @@ Developer pushes tag v2.1.0
        |
        v
 +-------------------+       +-------------------------+
-| GitHub Actions    |       | admin.cyberchakra.in    |
+| GitHub Actions    |       | cyberchakra.online      |
 | (CI/CD)           |       | (Admin Portal)          |
 |                   |       |                         |
 | 1. Validate tag   |       |  Release Management     |
@@ -514,7 +514,7 @@ jobs:
 | `TAURI_SIGNING_PRIVATE_KEY` | Minisign private key for binary signing (already exists) |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for the private key (already exists) |
 | `ADMIN_PORTAL_WEBHOOK_SECRET` | Shared secret for HMAC-SHA256 webhook authentication (NEW) |
-| `ADMIN_PORTAL_URL` | Base URL of admin portal, e.g., `https://admin.cyberchakra.in` (NEW) |
+| `ADMIN_PORTAL_URL` | Base URL of admin portal, e.g., `https://cyberchakra.online` (NEW) |
 | `SLACK_WEBHOOK_URL` | Slack incoming webhook (optional, already exists) |
 
 ---
@@ -958,7 +958,7 @@ The desktop app's `tauri.conf.json` updater endpoint must be updated from the ol
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://admin.cyberchakra.in/api/v1/update-check?target={{target}}&arch={{arch}}&current_version={{current_version}}"
+        "https://cyberchakra.online/api/v1/update-check?target={{target}}&arch={{arch}}&current_version={{current_version}}"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY4NjM1RDY2QTM2OERDMUYKUldRZjNHaWpabDFqYUFaRkZPYndDQ3dwZ3lvMXBSbUdVWlVLalZEN0gxVTF3Wnljcks4aHZvSmkK"
     }
@@ -1629,7 +1629,7 @@ The desktop app already has the updater plugin configured. The only change neede
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://admin.cyberchakra.in/api/v1/update-check?target={{target}}&arch={{arch}}&current_version={{current_version}}"
+        "https://cyberchakra.online/api/v1/update-check?target={{target}}&arch={{arch}}&current_version={{current_version}}"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY4NjM1RDY2QTM2OERDMUYKUldRZjNHaWpabDFqYUFaRkZPYndDQ3dwZ3lvMXBSbUdVWlVLalZEN0gxVTF3Wnljcks4aHZvSmkK",
       "windows": {
@@ -1802,7 +1802,7 @@ export function useUpdateChecker() {
       .AppImage, .AppImage.tar.gz, .AppImage.tar.gz.sig, .deb
    f. Generate SHA256 checksums
    g. Create GitHub Release with all artifacts
-   h. POST webhook to admin.cyberchakra.in/api/v1/webhooks/github
+   h. POST webhook to cyberchakra.online/api/v1/webhooks/github
       (HMAC-SHA256 authenticated, includes version + asset metadata)
 
 3. Admin Portal (auto):

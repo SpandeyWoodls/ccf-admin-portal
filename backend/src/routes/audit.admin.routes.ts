@@ -30,8 +30,12 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
     if (req.query.resourceType && typeof req.query.resourceType === "string") {
       where.resourceType = req.query.resourceType.slice(0, 100);
     }
-    if (req.query.adminUserId) where.adminUserId = req.query.adminUserId;
-    if (req.query.resourceId) where.resourceId = req.query.resourceId;
+    if (req.query.adminUserId && typeof req.query.adminUserId === "string") {
+      where.adminUserId = req.query.adminUserId.slice(0, 100);
+    }
+    if (req.query.resourceId && typeof req.query.resourceId === "string") {
+      where.resourceId = req.query.resourceId.slice(0, 100);
+    }
 
     // Date range filter with validation
     const fromDate = parseDate(req.query.from);

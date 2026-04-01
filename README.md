@@ -17,7 +17,7 @@ This portal replaces the legacy PHP license server with a full-stack TypeScript 
 | Email      | Nodemailer (SMTP)                                                          |
 | API Docs   | Swagger (swagger-jsdoc + swagger-ui-express)                               |
 | CI/CD      | GitHub Actions (CI on push, auto-deploy staging, manual deploy production) |
-| Hosting    | Hostinger Cloud VPS (admin.cyberchakra.in)                                 |
+| Hosting    | Hostinger Cloud VPS (cyberchakra.online)                                 |
 
 ---
 
@@ -202,8 +202,8 @@ admin-portal/
 │       └── deploy.yml               # Manual production deployment with confirmation gate
 │
 ├── .env.example                     # Root environment variable template
-├── .htaccess                        # LiteSpeed config for admin.cyberchakra.in
-├── .htaccess.license                # LiteSpeed config for license.cyberchakra.in
+├── .htaccess                        # LiteSpeed config for cyberchakra.online
+├── .htaccess.license                # LiteSpeed config for cyberchakra.online
 ├── docker-compose.yml               # Local MySQL 8.0 for development
 ├── package.json                     # Root workspace scripts
 ├── DEPLOYMENT_CHECKLIST.md
@@ -337,12 +337,12 @@ The desktop app uses `serde_json` to deserialize these responses. Response forma
 
 | Environment | URL                                  | Deploy method               |
 | ----------- | ------------------------------------ | --------------------------- |
-| Staging     | `https://admin-staging.cyberchakra.in` | Auto-deploy on push to `main` |
-| Production  | `https://admin.cyberchakra.in`       | Manual via GitHub Actions workflow_dispatch |
+| Staging     | `https://staging.cyberchakra.online` | Auto-deploy on push to `main` |
+| Production  | `https://cyberchakra.online`       | Manual via GitHub Actions workflow_dispatch |
 
 ### One-time Hostinger setup
 
-1. Create the subdomain `admin.cyberchakra.in` in hPanel
+1. Create the subdomain `cyberchakra.online` in hPanel
 2. Activate the SSL certificate (Let's Encrypt)
 3. Create a MySQL database in hPanel
 4. Configure Node.js in hPanel: version 20, entry file `backend/dist/index.js`
@@ -387,8 +387,8 @@ bash ~/scripts/hostinger-setup.sh   # First time only
 
 | Subdomain              | Type | Target            |
 | ---------------------- | ---- | ----------------- |
-| `admin.cyberchakra.in` | A    | Hostinger VPS IP  |
-| `license.cyberchakra.in` | A  | Same Hostinger IP (backward compatibility) |
+| `cyberchakra.online` | A    | Hostinger VPS IP  |
+| `cyberchakra.online` | A  | Same Hostinger IP (backward compatibility) |
 
 ### Database backups
 
