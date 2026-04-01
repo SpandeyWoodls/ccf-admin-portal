@@ -26,9 +26,18 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const REQUIRED_HEADER = "x-requested-with";
 const REQUIRED_VALUE = "XMLHttpRequest";
 
+// Public auth endpoints that issue tokens (not consume them) — exempt from CSRF
+const EXEMPT_PATHS = new Set(["/login", "/refresh", "/mfa/verify"]);
+
 export function csrfProtection(req: Request, _res: Response, next: NextFunction): void {
   // Allow safe (non-mutating) methods through without checks
   if (SAFE_METHODS.has(req.method)) {
+    return next();
+  }
+
+  // Exempt public auth endpoints (they issue tokens, don't require them)
+  const pathEnd = req.path.split("/").pop() || req.path;
+  if (EXEMPT_PATHS.has(req.path) || EXEMPT_PATHS.has("/" + pathEnd)) {
     return next();
   }
 
