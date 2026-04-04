@@ -41,7 +41,8 @@ const replyTicketSchema = z.object({
   ticket_number: z.string().min(1).max(50),
   license_key: z.string().min(1).max(50),
   message: z.string().min(1).max(10_000),
-  sender_name: z.string().min(1).max(255),
+  sender_name: z.string().min(1).max(255).optional().default("User"),
+  hardware_fingerprint: z.string().max(512).optional(),
 });
 
 // ─── Helper: generate ticket number ────────────────────────────────────────
