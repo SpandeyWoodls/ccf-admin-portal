@@ -41,6 +41,11 @@ export function csrfProtection(req: Request, _res: Response, next: NextFunction)
     return next();
   }
 
+  // If request has a valid Bearer token, JWT auth is stronger than CSRF
+  if (req.headers.authorization?.startsWith("Bearer ")) {
+    return next();
+  }
+
   const headerValue = req.headers[REQUIRED_HEADER];
 
   if (!headerValue || headerValue !== REQUIRED_VALUE) {
