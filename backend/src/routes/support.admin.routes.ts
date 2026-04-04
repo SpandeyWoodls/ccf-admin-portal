@@ -8,6 +8,7 @@ import { paginated } from "../lib/response.js";
 import { parsePagination } from "../lib/pagination.js";
 import { sendEmail } from "../services/email.js";
 import { ticketReplyNotificationEmail } from "../services/email-templates.js";
+import { ticketUpload, TICKET_UPLOADS_URL_PREFIX } from "../lib/upload.js";
 
 const router = Router();
 
@@ -16,9 +17,17 @@ router.use(requireAuth);
 
 // ─── Schemas ────────────────────────────────────────────────────────────────
 
+const attachmentSchema = z.object({
+  url: z.string(),
+  filename: z.string(),
+  size: z.number(),
+  mimeType: z.string(),
+});
+
 const replySchema = z.object({
   message: z.string().min(1).max(10_000),
   isInternal: z.boolean().optional().default(false),
+  attachments: z.array(attachmentSchema).optional().default([]),
 });
 
 const updateTicketSchema = z.object({
@@ -160,6 +169,7 @@ router.post(
           senderType: "support",
           senderName: req.admin!.name,
           isInternal: body.isInternal,
+          attachments: body.attachments.length > 0 ? body.attachments : undefined,
         },
       });
 
@@ -389,6 +399,56 @@ router.post(
         message: "Ticket assigned",
       });
     } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── POST /upload-attachment (admin file upload) ───────────────────────────
+
+router.post(
+  "/upload-attachment",
+  requireRole("admin", "super_admin", "support"),
+  ticketUpload.single("file"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.file) {
+        throw new AppError(400, "No file provided", "NO_FILE");
+      }
+
+      const file = req.file;
+      const url = `${TICKET_UPLOADS_URL_PREFIX}/${file.filename}`;
+
+      res.json({
+        success: true,
+        data: {
+          url,
+          filename: file.originalname,
+          size: file.size,
+          mimeType: file.mimetype,
+        },
+        error: null,
+        message: "File uploaded successfully",
+      });
+    } catch (err: any) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        res.status(413).json({
+          success: false,
+          data: null,
+          error: "FILE_TOO_LARGE",
+          message: "File exceeds 10MB limit",
+        });
+        return;
+      }
+      if (err.message?.startsWith("File type not allowed") || err.message?.startsWith("MIME type not allowed")) {
+        res.status(400).json({
+          success: false,
+          data: null,
+          error: "INVALID_FILE_TYPE",
+          message: err.message,
+        });
+        return;
+      }
       next(err);
     }
   },

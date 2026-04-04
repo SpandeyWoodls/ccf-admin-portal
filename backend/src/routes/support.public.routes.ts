@@ -7,6 +7,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import { sendEmail } from "../services/email.js";
 import { ticketReplyEmail, ticketConfirmationEmail } from "../services/email-templates.js";
 import { logAudit } from "../lib/audit.js";
+import { ticketUpload, TICKET_UPLOADS_URL_PREFIX } from "../lib/upload.js";
 
 const router = Router();
 
@@ -37,12 +38,20 @@ const ticketDetailsSchema = z.object({
   license_key: z.string().min(1).max(50),
 });
 
+const attachmentSchema = z.object({
+  url: z.string(),
+  filename: z.string(),
+  size: z.number(),
+  mimeType: z.string(),
+});
+
 const replyTicketSchema = z.object({
   ticket_number: z.string().min(1).max(50),
   license_key: z.string().min(1).max(50),
   message: z.string().min(1).max(10_000),
   sender_name: z.string().min(1).max(255).optional().default("User"),
   hardware_fingerprint: z.string().max(512).optional(),
+  attachments: z.array(attachmentSchema).optional().default([]),
 });
 
 // ─── Helper: generate ticket number ────────────────────────────────────────
@@ -207,6 +216,7 @@ router.post("/ticket-details", async (req: Request, res: Response, next: NextFun
             message: true,
             senderType: true,
             senderName: true,
+            attachments: true,
             createdAt: true,
           },
         },
@@ -239,6 +249,7 @@ router.post("/ticket-details", async (req: Request, res: Response, next: NextFun
           message: m.message,
           sender_type: m.senderType,
           sender_name: m.senderName,
+          attachments: m.attachments ?? [],
           created_at: m.createdAt.toISOString(),
           can_reply: canReply,
           is_initial: index === 0,
@@ -280,6 +291,7 @@ router.post("/reply-ticket", async (req: Request, res: Response, next: NextFunct
         message: body.message,
         senderType: "user",
         senderName: body.sender_name,
+        attachments: body.attachments.length > 0 ? body.attachments : undefined,
       },
     });
 
@@ -292,18 +304,29 @@ router.post("/reply-ticket", async (req: Request, res: Response, next: NextFunct
     }
 
     // Fire-and-forget: notify admin about new user reply on ticket
-    const { subject: emailSubject, html: emailHtml } = ticketReplyEmail(
-      ticket.ticketNumber,
-      ticket.subject,
-      body.message,
-    );
-    sendEmail(
-      process.env.SMTP_FROM || "admin@cyberchakra.in",
-      emailSubject,
-      emailHtml,
-    ).catch(err => {
-      console.error(`[Email] Failed to send to ${process.env.SMTP_FROM || "admin@cyberchakra.in"}:`, err.message);
-    });
+    // If ticket is assigned, email that admin; otherwise fall back to ADMIN_EMAIL
+    (async () => {
+      try {
+        let adminEmail: string | null = null;
+        if (ticket.assignedToId) {
+          const assignedAdmin = await prisma.adminUser.findUnique({
+            where: { id: ticket.assignedToId },
+            select: { email: true },
+          });
+          adminEmail = assignedAdmin?.email ?? null;
+        }
+        adminEmail = adminEmail || process.env.ADMIN_EMAIL || "ceo@cyberchakra.in";
+
+        const { subject: emailSubject, html: emailHtml } = ticketReplyEmail(
+          ticket.ticketNumber,
+          ticket.subject,
+          body.message,
+        );
+        await sendEmail(adminEmail, emailSubject, emailHtml);
+      } catch (err: any) {
+        console.error("[Email] Admin ticket reply notification failed:", err.message);
+      }
+    })();
 
     await logAudit({
       action: "ticket_reply_received",
@@ -328,5 +351,49 @@ router.post("/reply-ticket", async (req: Request, res: Response, next: NextFunct
     next(err);
   }
 });
+
+// ─── POST /upload-attachment ────────────────────────────────────────────────
+
+router.post(
+  "/upload-attachment",
+  ticketUpload.single("file"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.file) {
+        res.status(400).json(
+          desktopResponse(false, null, "NO_FILE", "No file provided"),
+        );
+        return;
+      }
+
+      const file = req.file;
+      const url = `${TICKET_UPLOADS_URL_PREFIX}/${file.filename}`;
+
+      res.json(
+        desktopResponse(true, {
+          url,
+          filename: file.originalname,
+          size: file.size,
+          mimeType: file.mimetype,
+        }, null, "File uploaded successfully"),
+      );
+    } catch (err: any) {
+      // Multer errors (file too large, wrong type, etc.)
+      if (err.code === "LIMIT_FILE_SIZE") {
+        res.status(413).json(
+          desktopResponse(false, null, "FILE_TOO_LARGE", "File exceeds 10MB limit"),
+        );
+        return;
+      }
+      if (err.message?.startsWith("File type not allowed") || err.message?.startsWith("MIME type not allowed")) {
+        res.status(400).json(
+          desktopResponse(false, null, "INVALID_FILE_TYPE", err.message),
+        );
+        return;
+      }
+      next(err);
+    }
+  },
+);
 
 export default router;

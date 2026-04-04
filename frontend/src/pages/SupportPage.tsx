@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Search,
   Send,
-  Headphones,
   Lock,
   CheckCircle2,
   XCircle,
@@ -14,6 +13,11 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
+  Paperclip,
+  X,
+  FileText,
+  Download,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { maskLicenseKey, cn } from "@/lib/utils";
 import {
   useSupportStore,
@@ -30,6 +35,95 @@ import {
   type Ticket,
   type TicketMessage,
 } from "@/stores/supportStore";
+
+// ---------------------------------------------------------------------------
+// Attachment types & helpers
+// ---------------------------------------------------------------------------
+
+interface UploadedAttachment {
+  url: string;
+  filename: string;
+  size: number;
+  mimeType: string;
+}
+
+interface PendingAttachment {
+  file: File;
+  previewUrl?: string; // object URL for image previews
+}
+
+const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
+const ACCEPTED_FILE_TYPES = ".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.doc,.docx,.zip,.rar,.7z";
+
+function isImageMime(mimeType: string): boolean {
+  return IMAGE_MIME_TYPES.includes(mimeType);
+}
+
+function isImageUrl(url: string): boolean {
+  return /\.(jpe?g|png|gif|webp|svg)(\?|$)/i.test(url);
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Upload a single file to the attachment endpoint */
+async function uploadAttachment(file: File): Promise<UploadedAttachment> {
+  const BASE_URL = import.meta.env.VITE_API_URL || "";
+
+  // Read auth token from local storage (same pattern as lib/api.ts)
+  let token: string | null = null;
+  try {
+    const stored = localStorage.getItem("ccf-auth");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      token = parsed?.state?.token ?? null;
+    }
+  } catch {
+    // ignore
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const headers: Record<string, string> = {
+    "X-Requested-With": "XMLHttpRequest",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${BASE_URL}/api/v1/admin/tickets/upload-attachment`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.message || `Upload failed (${res.status})`);
+  }
+
+  const json = await res.json();
+  // Handle envelope { success, data } or raw response
+  const data = json?.data ?? json;
+  return data as UploadedAttachment;
+}
+
+/** Parse attachment markers from a message body: [attachment:url|filename|size|mimeType] */
+function parseAttachments(text: string): { cleanText: string; attachments: UploadedAttachment[] } {
+  const attachments: UploadedAttachment[] = [];
+  const cleanText = text.replace(
+    /\[attachment:(.*?)\|(.*?)\|(.*?)\|(.*?)\]/g,
+    (_match, url, filename, size, mimeType) => {
+      attachments.push({ url, filename, size: Number(size), mimeType });
+      return "";
+    },
+  ).trim();
+  return { cleanText, attachments };
+}
 
 // ---------------------------------------------------------------------------
 // Config maps
@@ -133,6 +227,35 @@ function getInitials(name: string): string {
     .join("")
     .toUpperCase()
     .slice(0, 2);
+}
+
+/** Returns a human-readable date label for day separators */
+function formatDayLabel(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.floor((today.getTime() - msgDay.getTime()) / 86400000);
+
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return d.toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+  });
+}
+
+/** Check if two dates fall on different calendar days */
+function isDifferentDay(a: string, b: string): boolean {
+  const da = new Date(a);
+  const db = new Date(b);
+  return (
+    da.getFullYear() !== db.getFullYear() ||
+    da.getMonth() !== db.getMonth() ||
+    da.getDate() !== db.getDate()
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -239,6 +362,40 @@ function NoSelectionState() {
       <p className="mt-1 text-xs text-[hsl(var(--muted-foreground)/0.45)]">
         Choose from the list on the left to get started
       </p>
+    </div>
+  );
+}
+
+/** Typing indicator shown while a reply is being sent */
+function TypingIndicator() {
+  return (
+    <div className="flex items-center gap-2.5 flex-row-reverse">
+      <Avatar className="h-7 w-7 shrink-0 mt-1">
+        <AvatarFallback className="bg-[hsl(var(--primary))] text-white text-[9px] font-bold">
+          SA
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex items-center gap-1.5 rounded-lg rounded-tr-none bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] px-3.5 py-2.5">
+        <div className="flex items-center gap-1">
+          <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary)/0.5)] animate-bounce [animation-delay:0ms]" />
+          <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary)/0.5)] animate-bounce [animation-delay:150ms]" />
+          <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary)/0.5)] animate-bounce [animation-delay:300ms]" />
+        </div>
+        <span className="text-xs text-[hsl(var(--primary)/0.6)] ml-1">Sending...</span>
+      </div>
+    </div>
+  );
+}
+
+/** Day separator line between messages on different days */
+function DaySeparator({ dateStr }: { dateStr: string }) {
+  return (
+    <div className="flex items-center gap-3 py-1">
+      <div className="flex-1 border-t border-[hsl(var(--border)/0.4)]" />
+      <span className="text-[10px] font-medium text-[hsl(var(--muted-foreground)/0.45)] uppercase tracking-wider">
+        {formatDayLabel(dateStr)}
+      </span>
+      <div className="flex-1 border-t border-[hsl(var(--border)/0.4)]" />
     </div>
   );
 }
@@ -365,9 +522,19 @@ function TicketListItem({
 }
 
 /** Single message bubble in the conversation */
-function MessageBubble({ msg }: { msg: TicketMessage }) {
+function MessageBubble({
+  msg,
+  onImageClick,
+}: {
+  msg: TicketMessage;
+  onImageClick: (url: string) => void;
+}) {
   const isAdmin = msg.senderType === "admin" || msg.senderType === "support";
   const isNote = msg.isInternal;
+
+  // Parse attachment markers from the message body
+  const { cleanText, attachments } = parseAttachments(msg.message || "");
+  const displayText = cleanText || (!attachments.length ? "(no content)" : "");
 
   return (
     <div
@@ -384,16 +551,16 @@ function MessageBubble({ msg }: { msg: TicketMessage }) {
             isNote
               ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
               : isAdmin
-                ? "bg-[hsl(var(--primary)/0.15)] text-[hsl(var(--primary))]"
+                ? "bg-[hsl(var(--primary))] text-white"
                 : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]",
           )}
         >
           {isNote ? (
             <StickyNote className="h-3 w-3" />
           ) : isAdmin ? (
-            <Headphones className="h-3 w-3" />
+            "SA"
           ) : (
-            getInitials(msg.senderName || "U")
+            getInitials(msg.senderName || "User")
           )}
         </AvatarFallback>
       </Avatar>
@@ -405,7 +572,7 @@ function MessageBubble({ msg }: { msg: TicketMessage }) {
           isNote
             ? "rounded-lg border border-dashed border-amber-400/40 bg-amber-50/80 dark:border-amber-500/25 dark:bg-amber-950/30"
             : isAdmin
-              ? "rounded-lg rounded-tr-none bg-[hsl(var(--primary)/0.08)] border border-[hsl(var(--primary)/0.15)]"
+              ? "rounded-lg rounded-tr-none bg-[hsl(var(--primary)/0.12)] border border-[hsl(var(--primary)/0.25)] shadow-sm"
               : "rounded-lg rounded-tl-none bg-[hsl(var(--muted)/0.6)] border border-[hsl(var(--border)/0.8)]",
         )}
       >
@@ -429,17 +596,69 @@ function MessageBubble({ msg }: { msg: TicketMessage }) {
           </span>
         </div>
 
-        {/* Body */}
-        <p
-          className={cn(
-            "text-sm leading-relaxed whitespace-pre-wrap",
-            isNote
-              ? "text-amber-900/80 dark:text-amber-200/80"
-              : "text-[hsl(var(--foreground)/0.9)]",
-          )}
-        >
-          {msg.message || "(no content)"}
-        </p>
+        {/* Body text */}
+        {displayText && (
+          <p
+            className={cn(
+              "text-sm leading-relaxed whitespace-pre-wrap",
+              isNote
+                ? "text-amber-900/80 dark:text-amber-200/80"
+                : "text-[hsl(var(--foreground)/0.9)]",
+            )}
+          >
+            {displayText}
+          </p>
+        )}
+
+        {/* Inline attachments */}
+        {attachments.length > 0 && (
+          <div className="mt-2 space-y-2">
+            {attachments.map((att, idx) =>
+              isImageMime(att.mimeType) || isImageUrl(att.url) ? (
+                // Render image inline with click-to-enlarge
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => onImageClick(att.url)}
+                  className="block cursor-zoom-in rounded-md overflow-hidden border border-[hsl(var(--border)/0.4)] hover:border-[hsl(var(--primary)/0.4)] transition-colors"
+                >
+                  <img
+                    src={att.url}
+                    alt={att.filename}
+                    className="max-w-[300px] max-h-[200px] object-contain"
+                    loading="lazy"
+                  />
+                  <div className="flex items-center gap-1.5 px-2 py-1 bg-[hsl(var(--muted)/0.4)] text-[10px] text-[hsl(var(--muted-foreground)/0.7)]">
+                    <ImageIcon className="h-3 w-3" />
+                    <span className="truncate">{att.filename}</span>
+                    <span className="shrink-0">({formatFileSize(att.size)})</span>
+                  </div>
+                </button>
+              ) : (
+                // Render non-image as a download link
+                <a
+                  key={idx}
+                  href={att.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download={att.filename}
+                  className="flex items-center gap-2 rounded-md border border-[hsl(var(--border)/0.5)] bg-[hsl(var(--muted)/0.3)] px-3 py-2 hover:bg-[hsl(var(--muted)/0.5)] transition-colors group"
+                >
+                  <FileText className="h-4 w-4 shrink-0 text-[hsl(var(--muted-foreground)/0.6)]" />
+                  <div className="flex-1 min-w-0">
+                    <span className="block text-xs font-medium text-[hsl(var(--foreground)/0.8)] truncate">
+                      {att.filename}
+                    </span>
+                    <span className="text-[10px] text-[hsl(var(--muted-foreground)/0.5)]">
+                      {formatFileSize(att.size)}
+                    </span>
+                  </div>
+                  <Download className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--muted-foreground)/0.4)] group-hover:text-[hsl(var(--primary))] transition-colors" />
+                </a>
+              ),
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -475,9 +694,13 @@ export function SupportPage() {
   const [isSending, setIsSending] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Build filter object from current UI state
   const buildFilters = useCallback(
@@ -516,12 +739,25 @@ export function SupportPage() {
     }
   }, [selectedId, fetchTicket, clearSelectedTicket]);
 
+  // Poll for new messages every 10 seconds while a ticket is selected
+  useEffect(() => {
+    if (!selectedId) return;
+    const interval = setInterval(() => {
+      fetchTicket(selectedId, { silent: true });
+    }, 10_000);
+    return () => clearInterval(interval);
+  }, [selectedId, fetchTicket]);
+
   // Scroll to bottom when messages change
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [selectedTicket?.messages?.length, selectedId]);
+    // Use a small timeout to let the DOM update before scrolling
+    const t = setTimeout(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    }, 50);
+    return () => clearTimeout(t);
+  }, [selectedTicket?.messages?.length, selectedId, isSending]);
 
   // Ticket list (already filtered server-side by status + search)
   const safeTickets = Array.isArray(tickets) ? tickets : [];
@@ -532,6 +768,11 @@ export function SupportPage() {
       setSelectedId(id);
       setReplyText("");
       setIsInternal(false);
+      // Revoke any pending preview URLs and clear attachments
+      setPendingAttachments((prev) => {
+        prev.forEach((a) => { if (a.previewUrl) URL.revokeObjectURL(a.previewUrl); });
+        return [];
+      });
     },
     [],
   );
@@ -541,19 +782,70 @@ export function SupportPage() {
     setSelectedId(null);
   }, []);
 
+  // Add files from the file picker
+  const handleFilesSelected = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newAttachments: PendingAttachment[] = Array.from(files).map((file) => ({
+      file,
+      previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
+    }));
+
+    setPendingAttachments((prev) => [...prev, ...newAttachments]);
+
+    // Reset the input so the same file can be re-selected if removed
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
+
+  // Remove a pending attachment
+  const handleRemoveAttachment = useCallback((index: number) => {
+    setPendingAttachments((prev) => {
+      const updated = [...prev];
+      const removed = updated.splice(index, 1)[0];
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
+      return updated;
+    });
+  }, []);
+
   const handleSendReply = useCallback(async () => {
-    if (!replyText.trim() || !selectedId) return;
+    const hasText = replyText.trim().length > 0;
+    const hasAttachments = pendingAttachments.length > 0;
+    if ((!hasText && !hasAttachments) || !selectedId) return;
+
     setIsSending(true);
     try {
-      await replyToTicket(selectedId, replyText.trim(), isInternal);
+      // Upload all pending attachments first
+      let attachmentMarkers = "";
+      if (hasAttachments) {
+        setIsUploading(true);
+        const uploaded: UploadedAttachment[] = [];
+        for (const pa of pendingAttachments) {
+          const result = await uploadAttachment(pa.file);
+          uploaded.push(result);
+        }
+        setIsUploading(false);
+
+        // Build attachment markers to append to the message body
+        attachmentMarkers = uploaded
+          .map((att) => `\n[attachment:${att.url}|${att.filename}|${att.size}|${att.mimeType}]`)
+          .join("");
+      }
+
+      const fullMessage = (replyText.trim() + attachmentMarkers).trim();
+      await replyToTicket(selectedId, fullMessage, isInternal);
       setReplyText("");
       setIsInternal(false);
+      // Clean up preview URLs
+      pendingAttachments.forEach((a) => { if (a.previewUrl) URL.revokeObjectURL(a.previewUrl); });
+      setPendingAttachments([]);
     } catch {
+      setIsUploading(false);
       // Error is set in the store
     } finally {
       setIsSending(false);
     }
-  }, [replyText, selectedId, isInternal, replyToTicket]);
+  }, [replyText, selectedId, isInternal, replyToTicket, pendingAttachments]);
 
   const handleCloseTicket = useCallback(async () => {
     if (!selectedId) return;
@@ -832,9 +1124,19 @@ export function SupportPage() {
                 <div className="flex-1 overflow-y-auto p-4">
                   {selectedTicket.messages && selectedTicket.messages.length > 0 ? (
                     <div className="space-y-4">
-                      {selectedTicket.messages.map((msg) => (
-                        <MessageBubble key={msg.id} msg={msg} />
-                      ))}
+                      {selectedTicket.messages.map((msg, idx) => {
+                        const prev = idx > 0 ? selectedTicket.messages![idx - 1] : null;
+                        const showDaySep = !prev || isDifferentDay(prev.createdAt, msg.createdAt);
+                        return (
+                          <div key={msg.id}>
+                            {showDaySep && <DaySeparator dateStr={msg.createdAt} />}
+                            <div className={showDaySep ? "mt-3" : ""}>
+                              <MessageBubble msg={msg} onImageClick={setLightboxUrl} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {isSending && <TypingIndicator />}
                       <div ref={messagesEndRef} />
                     </div>
                   ) : (
@@ -847,8 +1149,8 @@ export function SupportPage() {
                   )}
                 </div>
 
-                {/* Reply box */}
-                <div className="border-t border-[hsl(var(--border))] p-4">
+                {/* Reply box -- sticky at bottom */}
+                <div className="sticky bottom-0 border-t border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 z-10">
                   {selectedTicket.status === "closed" ? (
                     <div className="flex items-center justify-center gap-2 py-2 text-sm text-[hsl(var(--muted-foreground)/0.6)]">
                       <XCircle className="h-4 w-4" />
@@ -856,27 +1158,89 @@ export function SupportPage() {
                     </div>
                   ) : (
                     <div className="space-y-2.5">
-                      <Textarea
-                        placeholder={
-                          isInternal
-                            ? "Write an internal note (not visible to the user)..."
-                            : "Type your reply..."
-                        }
-                        value={replyText}
-                        onChange={(e) => setReplyText(e.target.value)}
-                        rows={3}
-                        className={cn(
-                          "resize-none text-sm transition-shadow duration-200",
-                          "border-[hsl(var(--border))] focus:border-[hsl(var(--primary)/0.5)] focus:ring-2 focus:ring-[hsl(var(--primary)/0.12)] focus:shadow-[0_0_0_3px_hsl(var(--primary)/0.08)]",
-                          isInternal &&
-                            "border-dashed border-amber-400/40 bg-amber-50/50 focus:border-amber-400/60 focus:ring-amber-400/15 focus:shadow-[0_0_0_3px_hsl(45_93%_47%/0.08)] dark:bg-amber-950/20 dark:border-amber-500/30",
-                        )}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                            handleSendReply();
+                      {/* Pending attachment chips */}
+                      {pendingAttachments.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {pendingAttachments.map((pa, idx) => (
+                            <div
+                              key={idx}
+                              className="relative group flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--muted)/0.4)] px-2 py-1.5"
+                            >
+                              {/* Thumbnail or file icon */}
+                              {pa.previewUrl ? (
+                                <img
+                                  src={pa.previewUrl}
+                                  alt={pa.file.name}
+                                  className="h-8 w-8 rounded object-cover"
+                                />
+                              ) : (
+                                <FileText className="h-5 w-5 text-[hsl(var(--muted-foreground)/0.6)]" />
+                              )}
+                              <div className="min-w-0">
+                                <span className="block text-[11px] font-medium text-[hsl(var(--foreground)/0.8)] truncate max-w-[120px]">
+                                  {pa.file.name}
+                                </span>
+                                <span className="text-[9px] text-[hsl(var(--muted-foreground)/0.5)]">
+                                  {formatFileSize(pa.file.size)}
+                                </span>
+                              </div>
+                              {/* Remove button */}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveAttachment(idx)}
+                                className="ml-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--muted-foreground)/0.15)] text-[hsl(var(--muted-foreground)/0.6)] hover:bg-[hsl(var(--destructive)/0.15)] hover:text-[hsl(var(--destructive))] transition-colors"
+                                title="Remove attachment"
+                              >
+                                <X className="h-2.5 w-2.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Textarea with attachment button */}
+                      <div className="relative">
+                        <Textarea
+                          placeholder={
+                            isInternal
+                              ? "Write an internal note (not visible to the user)..."
+                              : "Type your reply..."
                           }
-                        }}
-                      />
+                          value={replyText}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          rows={3}
+                          className={cn(
+                            "resize-none text-sm transition-shadow duration-200 pr-10",
+                            "border-[hsl(var(--border))] focus:border-[hsl(var(--primary)/0.5)] focus:ring-2 focus:ring-[hsl(var(--primary)/0.12)] focus:shadow-[0_0_0_3px_hsl(var(--primary)/0.08)]",
+                            isInternal &&
+                              "border-dashed border-amber-400/40 bg-amber-50/50 focus:border-amber-400/60 focus:ring-amber-400/15 focus:shadow-[0_0_0_3px_hsl(45_93%_47%/0.08)] dark:bg-amber-950/20 dark:border-amber-500/30",
+                          )}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                              handleSendReply();
+                            }
+                          }}
+                        />
+                        {/* Paperclip attachment button */}
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-md text-[hsl(var(--muted-foreground)/0.5)] hover:text-[hsl(var(--foreground)/0.7)] hover:bg-[hsl(var(--muted)/0.6)] transition-colors"
+                          title="Attach file"
+                        >
+                          <Paperclip className="h-4 w-4" />
+                        </button>
+                        {/* Hidden file input */}
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          multiple
+                          accept={ACCEPTED_FILE_TYPES}
+                          onChange={handleFilesSelected}
+                          className="hidden"
+                        />
+                      </div>
+
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           {/* Toggle switch for internal note */}
@@ -916,18 +1280,28 @@ export function SupportPage() {
                         <Button
                           size="sm"
                           onClick={handleSendReply}
-                          disabled={!replyText.trim() || isSending}
+                          disabled={(!replyText.trim() && pendingAttachments.length === 0) || isSending}
                           className={cn(
                             "text-xs font-semibold shadow-sm",
-                            !isSending && replyText.trim() && "bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--primary)/0.85)] hover:from-[hsl(var(--primary)/0.9)] hover:to-[hsl(var(--primary)/0.75)]",
+                            !isSending && (replyText.trim() || pendingAttachments.length > 0) && "bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--primary)/0.85)] hover:from-[hsl(var(--primary)/0.9)] hover:to-[hsl(var(--primary)/0.75)]",
                           )}
                         >
                           {isSending ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              {isUploading ? "Uploading..." : "Sending..."}
+                            </>
                           ) : (
-                            <Send className="h-3.5 w-3.5" />
+                            <>
+                              <Send className="h-3.5 w-3.5" />
+                              {isInternal ? "Add Note" : "Send Reply"}
+                              {pendingAttachments.length > 0 && (
+                                <span className="ml-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-white/20 px-1 text-[9px] font-bold">
+                                  {pendingAttachments.length}
+                                </span>
+                              )}
+                            </>
                           )}
-                          {isInternal ? "Add Note" : "Send Reply"}
                         </Button>
                       </div>
                     </div>
@@ -938,6 +1312,19 @@ export function SupportPage() {
           </Card>
         </div>
       )}
+
+      {/* Image lightbox dialog */}
+      <Dialog open={!!lightboxUrl} onOpenChange={(open) => { if (!open) setLightboxUrl(null); }}>
+        <DialogContent className="max-w-[90vw] max-h-[90vh] p-2 bg-black/95 border-none">
+          {lightboxUrl && (
+            <img
+              src={lightboxUrl}
+              alt="Attachment preview"
+              className="max-w-full max-h-[85vh] object-contain mx-auto rounded"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

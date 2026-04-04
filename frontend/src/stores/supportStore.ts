@@ -74,7 +74,7 @@ interface SupportState {
   error: string | null;
 
   fetchTickets: (filters?: TicketFilters) => Promise<void>;
-  fetchTicket: (id: string) => Promise<void>;
+  fetchTicket: (id: string, options?: { silent?: boolean }) => Promise<void>;
   replyToTicket: (
     id: string,
     message: string,
@@ -141,8 +141,11 @@ export const useSupportStore = create<SupportState>()((set, get) => ({
     }
   },
 
-  fetchTicket: async (id: string) => {
-    set({ isDetailLoading: true, error: null });
+  fetchTicket: async (id: string, options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
+    if (!silent) {
+      set({ isDetailLoading: true, error: null });
+    }
     try {
       const raw = await apiGet<any>(`/api/v1/admin/tickets/${id}`);
       // Ensure messages is always an array and normalize fields
@@ -156,6 +159,11 @@ export const useSupportStore = create<SupportState>()((set, get) => ({
       };
       set({ selectedTicket: detail, isDetailLoading: false });
     } catch (err) {
+      // On silent poll failures, don't clear the ticket or show error
+      if (silent) {
+        console.warn("Silent poll failed:", err);
+        return;
+      }
       set({
         selectedTicket: null,
         isDetailLoading: false,
@@ -174,31 +182,56 @@ export const useSupportStore = create<SupportState>()((set, get) => ({
   ) => {
     // Don't set global isLoading -- use isSending in the component instead
     set({ error: null });
+
+    // Optimistic update: show the admin's message immediately
+    const optimisticId = `optimistic-${Date.now()}`;
+    const optimisticMsg: TicketMessage = {
+      id: optimisticId,
+      message,
+      isInternal,
+      senderName: "Support",
+      senderType: "admin",
+      createdAt: new Date().toISOString(),
+    };
+    const prevTicket = get().selectedTicket;
+    set((state) => {
+      const sel = state.selectedTicket;
+      if (sel?.id === id) {
+        return {
+          selectedTicket: {
+            ...sel,
+            messages: [...sel.messages, optimisticMsg],
+            status:
+              sel.status === "open" && !isInternal
+                ? "in_progress"
+                : sel.status,
+          },
+        };
+      }
+      return {};
+    });
+
     try {
       const reply = await apiPost<TicketMessage>(
         `/api/v1/admin/tickets/${id}/reply`,
         { message, isInternal },
       );
-      // Append reply to selected ticket messages
+      // Replace the optimistic message with the real one from the server
       set((state) => {
         const sel = state.selectedTicket;
         if (sel?.id === id) {
           return {
             selectedTicket: {
               ...sel,
-              messages: [
-                ...sel.messages,
-                {
-                  ...reply,
-                  message: reply.message || message,
-                  senderName: reply.senderName || "Support",
-                },
-              ],
-              // If status was "open" and not internal, backend moves to "in_progress"
-              status:
-                sel.status === "open" && !isInternal
-                  ? "in_progress"
-                  : sel.status,
+              messages: sel.messages.map((m) =>
+                m.id === optimisticId
+                  ? {
+                      ...reply,
+                      message: reply.message || message,
+                      senderName: reply.senderName || "Support",
+                    }
+                  : m,
+              ),
             },
           };
         }
@@ -206,6 +239,10 @@ export const useSupportStore = create<SupportState>()((set, get) => ({
       });
     } catch (err) {
       console.error("Failed to send reply:", err);
+      // Rollback: restore previous ticket state
+      if (prevTicket) {
+        set({ selectedTicket: prevTicket });
+      }
       set({
         error:
           err instanceof Error ? err.message : "Failed to send reply",

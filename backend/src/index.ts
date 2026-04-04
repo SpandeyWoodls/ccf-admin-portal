@@ -271,6 +271,12 @@ app.get("/license/update-check.php", publicApiLimiter, (req, res) => {
   res.redirect(301, `/api/v1/update-check${qs ? `?${qs}` : ""}`);
 });
 
+// ─── Serve uploaded ticket attachments ──────────────────────────────────────
+
+import { TICKET_UPLOADS_DIR } from "./lib/upload.js";
+
+app.use("/uploads/tickets", express.static(TICKET_UPLOADS_DIR));
+
 // ─── Serve frontend static files (production) ─────────────────────────────
 
 import path from "path";

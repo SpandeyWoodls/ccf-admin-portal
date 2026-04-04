@@ -426,13 +426,14 @@ model SupportTicket {
 }
 
 model TicketMessage {
-  id         String           @id @default(uuid()) @db.VarChar(36)
-  ticketId   String           @map("ticket_id") @db.VarChar(36)
-  message    String           @db.Text
-  senderType TicketSenderType @map("sender_type")
-  senderName String           @map("sender_name") @db.VarChar(255)
-  isInternal Boolean          @default(false) @map("is_internal")
-  createdAt  DateTime         @default(now()) @map("created_at")
+  id          String           @id @default(uuid()) @db.VarChar(36)
+  ticketId    String           @map("ticket_id") @db.VarChar(36)
+  message     String           @db.Text
+  senderType  TicketSenderType @map("sender_type")
+  senderName  String           @map("sender_name") @db.VarChar(255)
+  isInternal  Boolean          @default(false) @map("is_internal")
+  attachments Json?            @default("[]")
+  createdAt   DateTime         @default(now()) @map("created_at")
 
   ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
