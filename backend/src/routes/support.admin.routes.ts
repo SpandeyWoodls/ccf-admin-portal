@@ -167,7 +167,7 @@ router.post(
           ticketId: ticket.id,
           message: body.message,
           senderType: "support",
-          senderName: req.admin!.name,
+          senderName: body.isInternal ? req.admin!.name : "Customer Support",
           isInternal: body.isInternal,
           attachments: body.attachments.length > 0 ? body.attachments : undefined,
         },
