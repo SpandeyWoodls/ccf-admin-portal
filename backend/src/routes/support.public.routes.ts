@@ -1,5 +1,8 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { z } from "zod";
+import path from "path";
+import fs from "fs";
+import { v4 as uuidv4 } from "uuid";
 import { prisma } from "../lib/prisma.js";
 import { desktopResponse } from "../lib/response.js";
 import { uuidToNumericId } from "../lib/validation-token.js";
@@ -7,7 +10,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import { sendEmail } from "../services/email.js";
 import { ticketReplyEmail, ticketConfirmationEmail } from "../services/email-templates.js";
 import { logAudit } from "../lib/audit.js";
-import { ticketUpload, TICKET_UPLOADS_URL_PREFIX } from "../lib/upload.js";
+import { ticketUpload, TICKET_UPLOADS_URL_PREFIX, TICKET_UPLOADS_DIR } from "../lib/upload.js";
 
 const router = Router();
 
@@ -38,12 +41,23 @@ const ticketDetailsSchema = z.object({
   license_key: z.string().min(1).max(50),
 });
 
-const attachmentSchema = z.object({
+// URL-based attachment (from admin portal)
+const urlAttachmentSchema = z.object({
   url: z.string(),
   filename: z.string(),
   size: z.number(),
   mimeType: z.string(),
 });
+
+// Base64 attachment (from desktop app)
+const base64AttachmentSchema = z.object({
+  filename: z.string(),
+  mime_type: z.string(),
+  data: z.string(), // base64-encoded file content
+});
+
+// Accept either format
+const flexibleAttachmentSchema = z.union([urlAttachmentSchema, base64AttachmentSchema]);
 
 const replyTicketSchema = z.object({
   ticket_number: z.string().min(1).max(50),
@@ -51,8 +65,26 @@ const replyTicketSchema = z.object({
   message: z.string().min(1).max(10_000),
   sender_name: z.string().min(1).max(255).optional().default("User"),
   hardware_fingerprint: z.string().max(512).optional(),
-  attachments: z.array(attachmentSchema).optional().default([]),
+  attachments: z.array(flexibleAttachmentSchema).optional().default([]),
 });
+
+/** Save a base64-encoded attachment to disk and return a URL-format object */
+function saveBase64Attachment(att: { filename: string; mime_type: string; data: string }): { url: string; filename: string; size: number; mimeType: string } {
+  const ext = path.extname(att.filename).toLowerCase() || ".bin";
+  const uniqueName = `${uuidv4()}${ext}`;
+  const filePath = path.join(TICKET_UPLOADS_DIR, uniqueName);
+
+  const buffer = Buffer.from(att.data, "base64");
+  fs.writeFileSync(filePath, buffer);
+
+  const baseUrl = process.env.BASE_URL || "";
+  return {
+    url: `${baseUrl}${TICKET_UPLOADS_URL_PREFIX}/${uniqueName}`,
+    filename: att.filename,
+    size: buffer.length,
+    mimeType: att.mime_type,
+  };
+}
 
 // ─── Helper: generate ticket number ────────────────────────────────────────
 
@@ -249,7 +281,9 @@ router.post("/ticket-details", async (req: Request, res: Response, next: NextFun
           message: m.message,
           sender_type: m.senderType,
           sender_name: m.senderName,
-          attachments: m.attachments ?? [],
+          attachments: (m.attachments ?? []).map((a: any) =>
+            typeof a === "string" ? a : a.url ?? a
+          ),
           created_at: m.createdAt.toISOString(),
           can_reply: canReply,
           is_initial: index === 0,
@@ -285,13 +319,21 @@ router.post("/reply-ticket", async (req: Request, res: Response, next: NextFunct
       return;
     }
 
+    // Convert any base64 attachments to URL-based attachments
+    const processedAttachments = body.attachments.map((att: any) => {
+      if ("data" in att && "mime_type" in att) {
+        return saveBase64Attachment(att as { filename: string; mime_type: string; data: string });
+      }
+      return att;
+    });
+
     const message = await prisma.ticketMessage.create({
       data: {
         ticketId: ticket.id,
         message: body.message,
         senderType: "user",
         senderName: body.sender_name,
-        attachments: body.attachments.length > 0 ? body.attachments : undefined,
+        attachments: processedAttachments.length > 0 ? processedAttachments : undefined,
       },
     });
 
