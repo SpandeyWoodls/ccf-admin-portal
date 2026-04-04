@@ -73,7 +73,7 @@ interface SupportState {
   isDetailLoading: boolean;
   error: string | null;
 
-  fetchTickets: (filters?: TicketFilters) => Promise<void>;
+  fetchTickets: (filters?: TicketFilters, options?: { silent?: boolean }) => Promise<void>;
   fetchTicket: (id: string, options?: { silent?: boolean }) => Promise<void>;
   replyToTicket: (
     id: string,
@@ -98,8 +98,11 @@ export const useSupportStore = create<SupportState>()((set, get) => ({
   isDetailLoading: false,
   error: null,
 
-  fetchTickets: async (filters?: TicketFilters) => {
-    set({ isLoading: true, error: null });
+  fetchTickets: async (filters?: TicketFilters, options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
+    if (!silent) {
+      set({ isLoading: true, error: null });
+    }
     try {
       const params = new URLSearchParams();
       if (filters?.status && filters.status !== "all")
@@ -131,6 +134,11 @@ export const useSupportStore = create<SupportState>()((set, get) => ({
           : { ...DEFAULT_PAGINATION, total: tickets.length };
       set({ tickets, pagination: paginationData, isLoading: false });
     } catch (err) {
+      // On silent poll failures, keep current data and don't show error
+      if (silent) {
+        console.warn("Silent ticket list poll failed:", err);
+        return;
+      }
       set({
         tickets: [],
         pagination: { ...DEFAULT_PAGINATION },

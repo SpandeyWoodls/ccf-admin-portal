@@ -295,13 +295,16 @@ router.post("/reply-ticket", async (req: Request, res: Response, next: NextFunct
       },
     });
 
-    // If ticket was in "waiting" or "resolved", re-open it
+    // Always update the ticket's updatedAt so it bubbles up in the admin list.
+    // If ticket was in "waiting" or "resolved", also re-open it.
+    const ticketUpdateData: any = { updatedAt: new Date() };
     if (ticket.status === "waiting" || ticket.status === "resolved") {
-      await prisma.supportTicket.update({
-        where: { id: ticket.id },
-        data: { status: "open" },
-      });
+      ticketUpdateData.status = "open";
     }
+    await prisma.supportTicket.update({
+      where: { id: ticket.id },
+      data: ticketUpdateData,
+    });
 
     // Fire-and-forget: notify admin about new user reply on ticket
     // If ticket is assigned, email that admin; otherwise fall back to ADMIN_EMAIL

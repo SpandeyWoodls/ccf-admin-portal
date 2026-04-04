@@ -748,6 +748,14 @@ export function SupportPage() {
     return () => clearInterval(interval);
   }, [selectedId, fetchTicket]);
 
+  // Poll the ticket list every 30 seconds to surface new user replies
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchTickets(buildFilters({ page: pagination.page }), { silent: true });
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [fetchTickets, buildFilters, pagination.page]);
+
   // Scroll to bottom when messages change
   useEffect(() => {
     // Use a small timeout to let the DOM update before scrolling
